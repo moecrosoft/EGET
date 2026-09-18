@@ -221,3 +221,6 @@ __marimo__/
 
 # .claude
 .claude/settings.local.json
+
+# git worktrees (local, not shared)
+.worktrees/

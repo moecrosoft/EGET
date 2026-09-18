@@ -166,6 +166,9 @@ export const MRT_STATIONS = [
   { name: "Choa Chu Kang", lines: ["NSL", "BPL"], latitude: 1.3854, longitude: 103.7443 },
   { name: "Bukit Panjang", lines: ["DTL", "BPL"], latitude: 1.3789, longitude: 103.7622 },
   { name: "Clementi", lines: ["EWL"], latitude: 1.3151, longitude: 103.7650 },
+  { name: "Dover", lines: ["EWL"], latitude: 1.3114, longitude: 103.7786 },
+  { name: "one-north", lines: ["CCL"], latitude: 1.2998, longitude: 103.7876 },
+  { name: "Kent Ridge", lines: ["CCL"], latitude: 1.2933, longitude: 103.7845 },
   { name: "Sembawang", lines: ["NSL"], latitude: 1.4491, longitude: 103.8200 },
   { name: "Yishun", lines: ["NSL"], latitude: 1.4295, longitude: 103.8350 },
 ];

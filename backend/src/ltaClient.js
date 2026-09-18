@@ -70,7 +70,7 @@ export async function getBusArrivals(busStopCode) {
 
   try {
     const data = await ltaFetch(`/v3/BusArrival?BusStopCode=${encodeURIComponent(busStopCode)}`);
-    const services = (data.Services || []).map((svc) => {
+    let services = (data.Services || []).map((svc) => {
       const toMins = (iso) =>
         iso ? Math.max(0, Math.round((new Date(iso) - Date.now()) / 60000)) : null;
       return {
@@ -80,6 +80,22 @@ export async function getBusArrivals(busStopCode) {
         load: svc.NextBus?.Load || "unknown",
       };
     });
+
+    // BusArrival is a live feed and can come back empty for a stop that
+    // genuinely has scheduled services (data gap, off-hours, bus not yet
+    // dispatched) — fall back to the static BusRoutes schedule so the stop
+    // still shows which services stop there, just without a live ETA.
+    if (services.length === 0) {
+      const routes = await fetchAllBusRoutes();
+      const scheduledServiceNos = [...new Set(routes.filter((r) => r.BusStopCode === busStopCode).map((r) => r.ServiceNo))];
+      services = scheduledServiceNos.map((serviceNo) => ({
+        serviceNo,
+        nextArrivalMins: null,
+        nextArrival2Mins: null,
+        load: "unknown",
+      }));
+    }
+
     return {
       source: "live",
       busStopCode,

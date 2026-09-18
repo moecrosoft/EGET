@@ -759,6 +759,17 @@ async function loadBusRoute(serviceNo, direction = null) {
     const coords = stops.filter((s) => s.latitude != null && s.longitude != null).map((s) => [s.latitude, s.longitude]);
     if (coords.length > 1) {
       L.polyline(coords, { color: "#1f8a57", weight: 3.4 }).addTo(nearRouteLayer);
+      stops.forEach((s, i) => {
+        if (s.latitude == null || s.longitude == null) return;
+        const isEnd = i === 0 || i === stops.length - 1;
+        L.circleMarker([s.latitude, s.longitude], {
+          radius: isEnd ? 6 : 4,
+          color: "#0e1114",
+          weight: 1.5,
+          fillColor: isEnd ? "#f2f0ec" : "#1f8a57",
+          fillOpacity: 1,
+        }).addTo(nearRouteLayer);
+      });
       nearRouteMap.fitBounds(coords, { padding: [16, 16] });
     }
   } catch (err) {

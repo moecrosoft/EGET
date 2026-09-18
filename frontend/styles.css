@@ -281,7 +281,7 @@ body { background: var(--bg); color: var(--ink); }
 .near-title { font: 800 24px "Work Sans", sans-serif; color: var(--ink); letter-spacing: -0.02em; }
 .near-caption { font: 400 10.5px "Work Sans", sans-serif; color: var(--ink-4); margin-top: -4px; }
 
-#screen-near.active { height: 100%; }
+#screen-near.active { height: 100%; overflow: hidden; }
 .near-map-view { flex: 1; min-height: 0; }
 .near-map-wrap { flex: 1; min-height: 280px; position: relative; }
 
@@ -319,7 +319,7 @@ body { background: var(--bg); color: var(--ink); }
 #nearStopSheet .sheet-handle-row { display: none; }
 
 /* ---- Bus route (full-screen map + pull-up sheet) ---- */
-#screen-route.active { height: 100%; padding: 0; }
+#screen-route.active { height: 100%; padding: 0; overflow: hidden; }
 .route-back-overlay {
   position: absolute;
   top: 12px;

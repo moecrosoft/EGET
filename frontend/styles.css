@@ -133,13 +133,7 @@ body { background: var(--bg); color: var(--ink); }
   overflow-y: auto;
   max-height: 240px;
   z-index: 20;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
-.suggest-list::-webkit-scrollbar { width: 6px; }
-.suggest-list::-webkit-scrollbar-track { background: transparent; }
-.suggest-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
-.suggest-list::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 .suggest-item {
   display: block;
   width: 100%;
@@ -310,6 +304,17 @@ body { background: var(--bg); color: var(--ink); }
 .stop-sheet .sheet-handle-row { margin: 0 auto; }
 .stop-sheet .near-caption { padding: 0 16px; margin-top: -6px; }
 .stop-sheet .stop-list { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
+
+/* Themed scrollbar for every dark scrollable panel — replaces the default
+   OS scrollbar, which stands out white/light against this UI. */
+.stop-sheet .stop-list, #routeStopSheet .stop-seq, .suggest-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.stop-sheet .stop-list::-webkit-scrollbar, #routeStopSheet .stop-seq::-webkit-scrollbar, .suggest-list::-webkit-scrollbar { width: 6px; }
+.stop-sheet .stop-list::-webkit-scrollbar-track, #routeStopSheet .stop-seq::-webkit-scrollbar-track, .suggest-list::-webkit-scrollbar-track { background: transparent; }
+.stop-sheet .stop-list::-webkit-scrollbar-thumb, #routeStopSheet .stop-seq::-webkit-scrollbar-thumb, .suggest-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.stop-sheet .stop-list::-webkit-scrollbar-thumb:hover, #routeStopSheet .stop-seq::-webkit-scrollbar-thumb:hover, .suggest-list::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
 /* Stops-near-you list: plain list, no map — map only shows after picking a
    specific bus number (on the route screen). */

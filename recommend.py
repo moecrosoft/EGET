@@ -14,6 +14,14 @@ def find_relevant_messages(messages, keywords=("NEL", "North East Line", "CCL", 
     return relevant
 
 
+# Shared crowd ordering used both for picking the worse of two stations and
+# for comparing forecast slots — one definition, used everywhere below.
+CROWD_PRIORITY = {"l": 1, "m": 2, "h": 3, "NA": 2}
+
+# Single source of truth for the walk-estimate disclaimer, used on every
+# option that includes a walk leg — avoids drifting wording between them.
+WALK_DISCLAIMER = " [walk time(s) are estimates, pending real routing data]"
+
 # PLACEHOLDER walk-leg estimates — the brief requires door-to-door routing
 # ("a route that starts at a station and ends at a station is not a
 # commuter's journey"), but computing REAL walking time/distance needs
@@ -32,10 +40,9 @@ def recommend_for_arjun(train_alerts, punggol_crowd, serangoon_crowd, cycling_ok
     options = []
 
     # Combine crowd at both his key stations — worst of the two matters more
-    crowd_priority = {"h": 3, "m": 2, "l": 1, "NA": 2}
     worse_crowd = max(
         [punggol_crowd["level"], serangoon_crowd["level"]],
-        key=lambda lvl: crowd_priority.get(lvl, 2)
+        key=lambda lvl: CROWD_PRIORITY.get(lvl, 2)
     )
 
     # Advisory notes from the daily Message stream — relevant to Arjun's route only
@@ -47,9 +54,12 @@ def recommend_for_arjun(train_alerts, punggol_crowd, serangoon_crowd, cycling_ok
     # reflects typical weekday demand, which doesn't hold on those days, so the
     # "getting busier soon" nudge would be based on a pattern that doesn't apply today.
     forecast_warning = ""
-    if not is_atypical_day and forecast_level and crowd_priority.get(forecast_level, 2) > crowd_priority.get(worse_crowd, 2):
+    if not is_atypical_day and forecast_level and CROWD_PRIORITY.get(forecast_level, 2) > CROWD_PRIORITY.get(worse_crowd, 2):
         forecast_warning = f" — heads up: forecast shows it getting busier ('{forecast_level}') soon, consider leaving now"
     atypical_note = f" ({atypical_reason} — usual crowd forecast may not apply)" if is_atypical_day else ""
+
+    # Built once, reused by both LRT-based options below (previously duplicated)
+    shared_notes = forecast_warning + atypical_note + advisory_note
 
     exit_walk = walk_estimates["one_north_exit_to_office"]
 
@@ -59,7 +69,7 @@ def recommend_for_arjun(train_alerts, punggol_crowd, serangoon_crowd, cycling_ok
         options.append({
             "mode": f"cycle + LRT + walk {exit_walk}min (to office)",
             "crowd_level": worse_crowd,
-            "reason": ("Good weather" + (", low crowd on your route" if worse_crowd == "l" else f", crowd level '{worse_crowd}' at Punggol/Serangoon")) + forecast_warning + atypical_note + advisory_note + " [walk time is an estimate, pending real routing data]"
+            "reason": ("Good weather" + (", low crowd on your route" if worse_crowd == "l" else f", crowd level '{worse_crowd}' at Punggol/Serangoon")) + shared_notes + WALK_DISCLAIMER
         })
 
     # Option 2: regular LRT/NEL route (no cycling) — walk legs on both ends
@@ -67,7 +77,7 @@ def recommend_for_arjun(train_alerts, punggol_crowd, serangoon_crowd, cycling_ok
     options.append({
         "mode": f"walk {home_walk}min + LRT + walk {exit_walk}min",
         "crowd_level": worse_crowd,
-        "reason": ("Standard route" if cycling_ok else "Weather not ideal for cycling") + forecast_warning + atypical_note + advisory_note + " [walk times are estimates, pending real routing data]"
+        "reason": ("Standard route" if cycling_ok else "Weather not ideal for cycling") + shared_notes + WALK_DISCLAIMER
     })
 
     # Option 3: bus, if any service is available
@@ -85,7 +95,7 @@ def recommend_for_arjun(train_alerts, punggol_crowd, serangoon_crowd, cycling_ok
         bus_type_note = {"SD": "single-deck", "DD": "double-deck", "BD": "bendy"}.get(bus.get("bus_type"), "")
         if bus_type_note:
             reason += f" ({bus_type_note})"
-        reason += " [walk times are estimates, pending real routing data]"
+        reason += WALK_DISCLAIMER
 
         options.append({
             "mode": f"walk {bus_walk}min + Bus {bus['service_no']} + walk {exit_walk}min",
@@ -151,6 +161,38 @@ def rank_options(options):
     return scored
 
 
+def categorize_top_choices(ranked):
+    """
+    Reduces the full ranked list to three labelled picks, matching the brief's
+    "realistic timing, uncertainty made visible" principle — we only label a
+    category we can honestly back with real data.
+
+    - "best_overall": the #1 ranked option (already factors crowd, disruption,
+      forecast, atypical-day awareness).
+    - "most_comfortable": whichever option has the best (lowest) crowd_level,
+      which may differ from best_overall if e.g. the top pick was penalised
+      for a disruption but still has a genuinely low crowd reading.
+    - "fastest": deliberately NOT claimed here. This layer has no real transit
+      duration data (walk-leg minutes are placeholder estimates, not ride
+      time) — that requires the routing/GIS component's OneMap integration.
+      Returned as None with an explanatory note rather than a fabricated pick,
+      so the app never shows a confident number it can't back up.
+    """
+    if not ranked:
+        return {"best_overall": None, "most_comfortable": None, "fastest": None,
+                "fastest_note": "No options available."}
+
+    crowd_priority = {"l": 1, "SEA": 1, "m": 2, "SDA": 2, "h": 3, "LSD": 3, "NA": 2, "": 2}
+    most_comfortable = min(ranked, key=lambda pair: crowd_priority.get(pair[0]["crowd_level"], 2))
+
+    return {
+        "best_overall": ranked[0],
+        "most_comfortable": most_comfortable,
+        "fastest": None,
+        "fastest_note": "Not available from this layer — needs real transit duration data from routing/GIS (OneMap), not just crowd/walk estimates."
+    }
+
+
 def find_better_departure_window(forecast_slots, current_time_str, max_delay_minutes=60):
     """
     Matches Arjun's persona trait: 'will happily leave twenty minutes later to
@@ -163,7 +205,6 @@ def find_better_departure_window(forecast_slots, current_time_str, max_delay_min
     if not forecast_slots:
         return {"worth_delaying": False}
 
-    crowd_priority = {"l": 1, "m": 2, "h": 3, "NA": 2}
     current_time = datetime.fromisoformat(current_time_str)
 
     current_slot = None
@@ -174,14 +215,14 @@ def find_better_departure_window(forecast_slots, current_time_str, max_delay_min
         else:
             break
     current_level = current_slot["level"] if current_slot else "NA"
-    best_score = crowd_priority.get(current_level, 2)
+    best_score = CROWD_PRIORITY.get(current_level, 2)
 
     best_slot = None
     for slot in forecast_slots:
         slot_time = datetime.fromisoformat(slot["start_time"])
         delay = (slot_time - current_time).total_seconds() / 60
         if 0 < delay <= max_delay_minutes:
-            score = crowd_priority.get(slot["level"], 2)
+            score = CROWD_PRIORITY.get(slot["level"], 2)
             if score < best_score:
                 best_score = score
                 best_slot = slot

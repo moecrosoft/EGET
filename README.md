@@ -24,7 +24,7 @@ door-to-door set of travel recommendations for Arjun's morning commute.
    python -m venv venv
    venv\Scripts\activate      # Windows
    source venv/bin/activate   # Mac/Linux
-   pip install requests python-dotenv
+   pip install -r requirements.txt
    ```
 3. Create a `.env` file in the project root with:
    ```
@@ -53,6 +53,7 @@ This runs two scenarios:
 | `parsing.py` | Normalizes raw API responses into clean internal data structures; also holds the fixed 2026 school vacation date ranges. |
 | `recommend.py` | Core decision logic — scores and ranks door-to-door travel options for Arjun. |
 | `main.py` | Entry point — runs the live pipeline and the disruption test fixture. |
+| `requirements.txt` | Pinned Python dependencies (`requests`, `python-dotenv`) — install with `pip install -r requirements.txt`. |
 
 ## Integration point for the team
 
@@ -81,7 +82,19 @@ ranked = rank_options(recommendations)
 `crowd_level`, and `reason` (human-readable explanation, including any relevant daily
 advisory from `TrainServiceAlerts.Message` and a note when walk times are estimates).
 
-`run_live()` in `main.py` returns `{"generated_at": <ISO timestamp>, "recommendations": ranked}`
+For a simplified three-way view instead of the full list:
+```python
+from recommend import categorize_top_choices
+
+top_picks = categorize_top_choices(ranked)
+# top_picks["best_overall"]       -> (option_dict, score) tuple, or None if ranked is empty
+# top_picks["most_comfortable"]   -> (option_dict, score) tuple, lowest crowd_level
+# top_picks["fastest"]            -> always None currently — no real transit duration data
+#                                     exists in this layer yet (walk minutes are estimates,
+#                                     not ride time). See top_picks["fastest_note"].
+```
+
+`run_live()` in `main.py` returns `{"generated_at": <ISO timestamp>, "recommendations": ranked, "top_picks": top_picks}`
 — the timestamp is there so a caller (frontend) can judge data freshness, e.g. for the
 no-signal-underground case (see WRITEUP.md).
 

@@ -5,7 +5,7 @@ from parsing import (
     get_station_forecast, get_forecast_for_time, parse_public_holidays, is_public_holiday,
     is_school_vacation
 )
-from recommend import recommend_for_arjun, rank_options, find_better_departure_window
+from recommend import recommend_for_arjun, rank_options, find_better_departure_window, categorize_top_choices
 
 SGT = timezone(timedelta(hours=8))
 
@@ -57,6 +57,7 @@ def run_live():
         atypical_reason=atypical_reason
     )
     ranked = rank_options(recommendations)
+    top_picks = categorize_top_choices(ranked)
 
     # Freshness timestamp: this data layer only ever returns a live snapshot —
     # it does not cache or know about connectivity state. When wrapped in an
@@ -65,12 +66,20 @@ def run_live():
     # underground (see WRITEUP.md for the full offline-behavior boundary).
     result = {
         "generated_at": now_str,
-        "recommendations": ranked
+        "recommendations": ranked,
+        "top_picks": top_picks
     }
 
     print(f"Ranked recommendations for Arjun (live data, generated {now_str}):")
     for opt, score in ranked:
         print(f" - [{score}] {opt['mode']}: {opt['reason']}")
+
+    print("\nTop picks:")
+    best = top_picks["best_overall"]
+    comfy = top_picks["most_comfortable"]
+    print(f" - Best Overall: {best[0]['mode']} — {best[0]['reason']}")
+    print(f" - Most Comfortable: {comfy[0]['mode']} — {comfy[0]['reason']}")
+    print(f" - Fastest: not shown — {top_picks['fastest_note']}")
 
     return result
 

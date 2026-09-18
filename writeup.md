@@ -62,6 +62,20 @@ forecasted worsening (even with calm real-time conditions) applies a smaller pro
 penalty. Options are ranked, and the top option is what the app would surface to
 Arjun, each with a plain-language reason attached.
 
+**Simplified three-way picks:** per the brief's principle of making "realistic timing,
+with the uncertainty made visible rather than hidden behind a single confident number,"
+`categorize_top_choices()` reduces the full ranked list to three labelled picks rather
+than showing every option at once — but only labels what it can honestly back with
+real data: **Best Overall** (the #1 ranked option) and **Most Comfortable** (lowest
+crowd_level, which can differ from Best Overall — e.g. a low-crowd option penalised
+for a disruption still wins Most Comfortable even if it's not #1 overall). **Fastest is
+deliberately returned as `None`** with an explanatory note, rather than fabricated —
+this layer has no real transit duration data (walk-leg minutes are placeholder
+estimates, not ride time), so labelling anything "Fastest" would itself be the kind of
+hidden, unbacked confident number the brief warns against. Once routing/GIS supplies
+real duration estimates, that figure can replace the `None` without changing the
+function's structure.
+
 **Proactive delay suggestion:** Arjun's persona explicitly states he *"will happily
 leave twenty minutes later to avoid a crush."* `find_better_departure_window()` scans
 the forecast up to 60 minutes ahead of the actual current time and, when a meaningfully

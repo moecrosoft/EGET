@@ -132,18 +132,23 @@ function updateWeatherBanner(weather) {
   }
 }
 
-function legCard(leg) {
-  const mins = leg.durationSeconds != null ? Math.round(leg.durationSeconds / 60) : "–";
-  const label =
-    leg.mode === "BUS" ? (leg.route ? `Bus ${leg.route}` : "Bus") :
-    leg.mode === "RAIL" || leg.mode === "SUBWAY" ? (leg.route ? `Line ${leg.route}` : "Train") :
+function legModeLabel(leg) {
+  return leg.mode === "BUS" ? (leg.route ? `Bus ${leg.route}` : "Bus") :
+    leg.mode === "RAIL" || leg.mode === "SUBWAY" ? (leg.route ? `${leg.route} Line` : "Train") :
     leg.mode === "CYCLE" ? "Cycle" :
     leg.mode === "WALK" ? "Walk" : leg.mode;
+}
+
+function legCard(leg, isLast) {
+  const mins = leg.durationSeconds != null ? Math.round(leg.durationSeconds / 60) : "–";
+  const label = legModeLabel(leg);
   const color = MODE_COLOR[leg.mode] || "#8791ab";
+  const changeFlag = !isLast && leg.to ? `<span class="leg-flag">Change at ${leg.to}</span>` : "";
   return `<div class="leg-card">
     ${pathSvg(MODE_ICON[leg.mode] || ICON.walk, { size: 26, stroke: color, width: 1.6 })}
     <span class="leg-mins">${mins}</span>
     <span class="leg-label">${label}</span>
+    ${changeFlag}
   </div>`;
 }
 
@@ -173,7 +178,7 @@ function renderBoardPersona(data) {
       <span class="mode-eta-label">Arrive</span>
     </span>`;
 
-  $("boardLegStrip").innerHTML = (rec.legs || []).map(legCard).join("") || `<div class="hint-text">No route legs available.</div>`;
+  $("boardLegStrip").innerHTML = (rec.legs || []).map((leg, i, arr) => legCard(leg, i === arr.length - 1)).join("") || `<div class="hint-text">No route legs available.</div>`;
 
   plotLegs(boardMap, boardLayer, rec.legs);
 
@@ -223,7 +228,7 @@ function renderBoardCustom(route) {
       <span class="mode-eta-label">Arrive</span>
     </span>`;
 
-  $("boardLegStrip").innerHTML = (selected.legs || []).map(legCard).join("") || `<div class="hint-text">No route legs available.</div>`;
+  $("boardLegStrip").innerHTML = (selected.legs || []).map((leg, i, arr) => legCard(leg, i === arr.length - 1)).join("") || `<div class="hint-text">No route legs available.</div>`;
   plotLegs(boardMap, boardLayer, selected.legs);
   $("boardLeaveLater").hidden = true;
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
@@ -259,7 +264,7 @@ function startNav(option, leaveTime, arriveTime, alternative) {
     : "Head to your first stop";
   $("navInstructionSub").textContent = `Leave ${leaveTime}`;
   $("navNextLabel").textContent = next
-    ? `Then ${next.mode === "BUS" ? "bus" : next.mode.toLowerCase()}${next.route ? " " + next.route : ""} to ${next.to || "your next stop"}`
+    ? `Change to ${legModeLabel(next)}${current?.to ? " at " + current.to : ""}`
     : "Last leg of the trip";
   $("navArrive").textContent = arriveTime;
 

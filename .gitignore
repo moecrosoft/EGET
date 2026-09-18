@@ -1,0 +1,11 @@
+# Environment files — never commit real keys
+.env
+.env.local
+backend/.env
+
+# Dependencies
+node_modules/
+
+# OS / editor noise
+.DS_Store
+*.log

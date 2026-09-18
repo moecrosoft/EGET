@@ -41,8 +41,6 @@ Must build for exactly one (not yet chosen — update this once decided):
 - **Line codes are inconsistent across DataMall endpoints** — reconciling them is required work, not a bug.
 - **Crowding is three distinct signals**, not interchangeable: `PlatformCrowdDensityRealTime`,
   `PlatformCrowdDensityForecast`, and the bus-load field in `BusArrival`.
-- `data/4dayWeatherForecast.json` / `data/24hourWeatherForecast.json` are OpenAPI **specs** for
-  data.gov.sg endpoints, not weather data itself.
 - `TrainServiceAlerts.AffectedSegments` is empty on a normal day — do not build a demo that depends on
   a live disruption; injected/replay test data is fine if clearly labelled as such.
 - OSM data: Geofabrik extract for bulk SG data, Overpass API for targeted queries, OSRM/GraphHopper/Valhalla

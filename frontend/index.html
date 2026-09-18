@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Commute Companion</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        Commute Companion
+      </div>
+      <div class="topbar-status" id="dataSource">checking data source…</div>
+    </header>
+
+    <main class="pages">
+      <section class="page active" id="page-home" data-page="home">
+        <section class="panel announcement-panel">
+          <div class="announcement-panel-head">
+            <h2>Announcements</h2>
+            <span id="alertCount" class="alert-count" hidden>0</span>
+          </div>
+          <div id="lineMap" class="line-map"></div>
+          <div id="alertFeed" class="alert-feed">Loading…</div>
+          <button id="demoNextBtn" class="secondary">Simulate next disruption (demo)</button>
+        </section>
+
+        <section class="panel search-panel">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input id="destSearchInput" placeholder="Where are you going?" />
+          </div>
+          <button id="destSearchBtn">Find best route</button>
+          <div id="routeMap" class="leaflet-map section-gap" hidden></div>
+          <div id="routeResult" class="route-result"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Favourites</h2>
+          <div id="favouritesList" class="nearby-list">
+            <p class="hint">Star a station or bus stop above to pin it here.</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="page" id="page-journey" data-page="journey">
+        <section class="panel">
+          <h2>Arjun's journey — Punggol &rarr; one-north</h2>
+          <p class="hint">Cycle+LRT vs bus-only, with real live routing, crowding and weather.</p>
+          <div class="time-toggle" id="journeyTimeToggle">
+            <button id="journeyNowBtn" class="time-toggle-btn active">
+              Leave now<span class="sub" id="journeyNowTime"></span>
+            </button>
+            <button id="journeyLaterBtn" class="time-toggle-btn" disabled>
+              Later<span class="sub" id="journeyLaterLabel">checking…</span>
+            </button>
+          </div>
+          <p class="hint" id="journeyHint"></p>
+          <div id="journeyMap" class="leaflet-map section-gap"></div>
+          <div id="journeyOptions" class="journey-options">Loading…</div>
+        </section>
+      </section>
+
+      <section class="page" id="page-chat" data-page="chat">
+        <section class="panel chat-panel">
+          <h2>Ask the agent</h2>
+          <div id="chatLog" class="chat-log"></div>
+          <div class="chat-input-row">
+            <input id="chatInput" placeholder="e.g. Is my usual route affected today?" />
+            <button id="sendBtn">Send</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <button id="nearbyPullTab" class="pull-tab">
+      <span class="pull-tab-handle"></span>
+      <span class="pull-tab-label"><span class="near-you-icon">📍</span>Near you<span class="pull-tab-chevron">⌃</span></span>
+    </button>
+
+    <nav class="tabbar">
+      <button class="tab-btn active" data-tab="home">
+        <span class="tab-icon">🏠</span>Home
+      </button>
+      <button class="tab-btn" data-tab="journey">
+        <span class="tab-icon">🚲</span>Journey
+      </button>
+      <button class="tab-btn" data-tab="chat">
+        <span class="tab-icon">💬</span>Chat
+      </button>
+    </nav>
+
+    <div id="routeDetailModal" class="modal-overlay" hidden>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <div id="routeDetailTitle" class="modal-title">Bus route</div>
+          <button id="routeDetailClose" class="modal-close" aria-label="Close">✕</button>
+        </div>
+        <div id="routeDetailBody" class="modal-body"></div>
+      </div>
+    </div>
+
+    <div id="nearbySheet" class="modal-overlay" hidden>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <div class="modal-title"><span class="near-you-icon">📍</span>Near you</div>
+          <button id="nearbySheetClose" class="modal-close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="hint" id="nearbyStatus"></p>
+          <div class="time-toggle" id="nearbyTabs">
+            <button class="time-toggle-btn active" data-nearby-tab="stops">🚌 Bus</button>
+            <button class="time-toggle-btn" data-nearby-tab="stations">🚇 MRT/LRT</button>
+          </div>
+          <p class="hint section-gap" id="nearbyStopsHint">Tap a bus number for its route.</p>
+          <div id="nearbyBusStops" class="nearby-list nearby-tab-panel active"></div>
+          <div id="nearbyStations" class="nearby-list nearby-tab-panel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

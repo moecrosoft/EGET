@@ -3,126 +3,162 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Commute Companion</title>
+  <title>EGET</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&family=Work+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <div class="app">
+    <div id="weatherBanner" class="weather-banner" hidden>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13.5a4 4 0 013-6.4 5 5 0 019 2.4 3 3 0 01-1 6H9M8.5 19l-1 2M12.5 19l-1 2M16.5 19l-1 2"></path></svg>
+      <span id="weatherBannerText">Rain nearby &middot; plan changed</span>
+    </div>
+
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-dot"></span>
-        Commute Companion
-      </div>
-      <div class="topbar-status" id="dataSource">checking data source…</div>
+      <div class="brand">EGET</div>
+      <div class="clock" id="clock">--:--</div>
     </header>
 
-    <main class="pages">
-      <section class="page active" id="page-home" data-page="home">
-        <section class="panel announcement-panel">
-          <div class="announcement-panel-head">
-            <h2>Announcements</h2>
-            <span id="alertCount" class="alert-count" hidden>0</span>
-          </div>
-          <div id="lineMap" class="line-map"></div>
-          <div id="alertFeed" class="alert-feed">Loading…</div>
-          <button id="demoNextBtn" class="secondary">Simulate next disruption (demo)</button>
-        </section>
+    <main class="screens">
+      <section class="screen active" data-screen="plan" id="screen-plan">
+        <div class="plan-title">Where to?</div>
 
-        <section class="panel search-panel">
-          <div class="search-bar">
-            <span class="search-icon">🔍</span>
-            <input id="destSearchInput" placeholder="Where are you going?" />
+        <div class="route-row">
+          <div class="route-spine">
+            <span class="spine-dot"></span>
+            <span class="spine-line"></span>
+            <span class="spine-sq"></span>
           </div>
-          <button id="destSearchBtn">Find best route</button>
-          <div id="routeMap" class="leaflet-map section-gap" hidden></div>
-          <div id="routeResult" class="route-result"></div>
-        </section>
+          <div class="route-fields">
+            <div class="field">
+              <div class="field-label">From</div>
+              <div class="field-value">Current location</div>
+            </div>
+            <div class="field field-to">
+              <div class="field-label">To</div>
+              <input id="planToInput" class="field-input" placeholder="Search a destination&hellip;" />
+            </div>
+          </div>
+        </div>
 
-        <section class="panel">
-          <h2>Favourites</h2>
-          <div id="favouritesList" class="nearby-list">
-            <p class="hint">Star a station or bus stop above to pin it here.</p>
-          </div>
-        </section>
+        <div class="recents" id="planRecents">
+          <button class="recent-row" data-recent="one-north">
+            <svg class="recent-icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#8b8f95" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"></path></svg>
+            <span class="recent-text">
+              <span class="recent-name">one-north</span>
+              <span class="recent-sub">Fusionopolis Way &middot; work</span>
+            </span>
+            <span class="recent-arrow">&rarr;</span>
+          </button>
+          <button class="recent-row" data-recent="Sengkang Grand Mall">
+            <svg class="recent-icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#8b8f95" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1 12H5L4 8zM9 8V6a3 3 0 016 0v2"></path></svg>
+            <span class="recent-text">
+              <span class="recent-name">Sengkang Grand Mall</span>
+              <span class="recent-sub">Compassvale Bow &middot; saved</span>
+            </span>
+            <span class="recent-arrow">&rarr;</span>
+          </button>
+          <button class="recent-row" data-recent="Tampines Hub">
+            <svg class="recent-icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#8b8f95" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2M12 3a9 9 0 109 9 9 9 0 10-9-9"></path></svg>
+            <span class="recent-text">
+              <span class="recent-name">Tampines Hub</span>
+              <span class="recent-sub">last searched</span>
+            </span>
+            <span class="recent-arrow">&rarr;</span>
+          </button>
+        </div>
+
+        <button id="planFindBtn" class="cta-primary plan-cta">Find my route</button>
       </section>
 
-      <section class="page" id="page-journey" data-page="journey">
-        <section class="panel">
-          <h2>Arjun's journey — Punggol &rarr; one-north</h2>
-          <p class="hint">Cycle+LRT vs bus-only, with real live routing, crowding and weather.</p>
-          <div class="time-toggle" id="journeyTimeToggle">
-            <button id="journeyNowBtn" class="time-toggle-btn active">
-              Leave now<span class="sub" id="journeyNowTime"></span>
-            </button>
-            <button id="journeyLaterBtn" class="time-toggle-btn" disabled>
-              Later<span class="sub" id="journeyLaterLabel">checking…</span>
-            </button>
-          </div>
-          <p class="hint" id="journeyHint"></p>
-          <div id="journeyMap" class="leaflet-map section-gap"></div>
-          <div id="journeyOptions" class="journey-options">Loading…</div>
-        </section>
+      <section class="screen" data-screen="board" id="screen-board">
+        <button id="tripBar" class="trip-bar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
+          <span id="tripBarLabel">Punggol Field &rarr; one-north</span>
+        </button>
+
+        <div id="boardMap" class="map-panel map-board"></div>
+
+        <div id="boardModeRow" class="mode-row">Loading&hellip;</div>
+        <div id="boardLegStrip" class="leg-strip"></div>
+
+        <div id="boardLeaveLater" class="leave-later-row" hidden>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#9aa0a6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2M12 3a9 9 0 109 9 9 9 0 10-9-9"></path></svg>
+          <span id="boardLeaveLaterLabel" class="leave-later-label"></span>
+          <span class="hold-pill">HOLD</span>
+        </div>
+
+        <button id="boardLeaveNowBtn" class="cta-primary">Leave now</button>
       </section>
 
-      <section class="page" id="page-chat" data-page="chat">
-        <section class="panel chat-panel">
-          <h2>Ask the agent</h2>
-          <div id="chatLog" class="chat-log"></div>
-          <div class="chat-input-row">
-            <input id="chatInput" placeholder="e.g. Is my usual route affected today?" />
-            <button id="sendBtn">Send</button>
+      <section class="screen" data-screen="near" id="screen-near">
+        <div id="nearList" class="near-level">
+          <div class="near-title">Stops near you</div>
+          <div id="nearMap" class="map-panel map-near"></div>
+          <div class="near-caption">Live arrivals from LTA, refreshed on open</div>
+          <div id="nearStopList" class="stop-list">Loading&hellip;</div>
+        </div>
+
+        <div id="nearDetail" class="near-level" hidden>
+          <button id="nearBackBtn" class="back-row">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
+            <span>All stops</span>
+          </button>
+          <div>
+            <div id="nearStopName" class="stop-detail-name"></div>
+            <div id="nearStopMeta" class="stop-detail-meta"></div>
           </div>
-        </section>
+          <div id="nearBusRows" class="bus-rows"></div>
+          <div class="route-section">
+            <div id="nearRouteLabel" class="route-label"></div>
+            <div id="nearRouteMap" class="map-panel map-route"></div>
+            <div id="nearStopSeq" class="stop-seq"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="nav" id="screen-nav">
+        <div class="nav-map-wrap">
+          <div id="navMap" class="map-panel map-nav"></div>
+          <button id="navPlanBtn" class="plan-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f2f0ec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
+            <span>Plan</span>
+          </button>
+        </div>
+        <div class="nav-sheet">
+          <div class="nav-instruction-row">
+            <svg id="navModeIcon" class="nav-mode-icon" viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="#f2f0ec" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d=""></path></svg>
+            <div class="nav-instruction-text">
+              <span id="navInstruction" class="nav-instruction"></span>
+              <span id="navInstructionSub" class="nav-instruction-sub"></span>
+            </div>
+          </div>
+          <div class="nav-next-row">
+            <span id="navNextLabel" class="nav-next-label"></span>
+            <span id="navArrive" class="nav-arrive"></span>
+          </div>
+          <button id="navEndBtn" class="end-trip-btn">End trip</button>
+        </div>
       </section>
     </main>
 
-    <button id="nearbyPullTab" class="pull-tab">
-      <span class="pull-tab-handle"></span>
-      <span class="pull-tab-label"><span class="near-you-icon">📍</span>Near you<span class="pull-tab-chevron">⌃</span></span>
-    </button>
-
-    <nav class="tabbar">
-      <button class="tab-btn active" data-tab="home">
-        <span class="tab-icon">🏠</span>Home
+    <nav class="tabbar" id="tabbar">
+      <button class="tab-btn active" data-tab="board">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7M6 10v10h12V10"></path></svg>
+        <span>Today</span>
       </button>
-      <button class="tab-btn" data-tab="journey">
-        <span class="tab-icon">🚲</span>Journey
-      </button>
-      <button class="tab-btn" data-tab="chat">
-        <span class="tab-icon">💬</span>Chat
+      <button class="tab-btn" data-tab="near">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM9.5 10a2.5 2.5 0 105 0 2.5 2.5 0 10-5 0"></path></svg>
+        <span>Near you</span>
       </button>
     </nav>
-
-    <div id="routeDetailModal" class="modal-overlay" hidden>
-      <div class="modal-sheet">
-        <div class="modal-header">
-          <div id="routeDetailTitle" class="modal-title">Bus route</div>
-          <button id="routeDetailClose" class="modal-close" aria-label="Close">✕</button>
-        </div>
-        <div id="routeDetailBody" class="modal-body"></div>
-      </div>
-    </div>
-
-    <div id="nearbySheet" class="modal-overlay" hidden>
-      <div class="modal-sheet">
-        <div class="modal-header">
-          <div class="modal-title"><span class="near-you-icon">📍</span>Near you</div>
-          <button id="nearbySheetClose" class="modal-close" aria-label="Close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="hint" id="nearbyStatus"></p>
-          <div class="time-toggle" id="nearbyTabs">
-            <button class="time-toggle-btn active" data-nearby-tab="stops">🚌 Bus</button>
-            <button class="time-toggle-btn" data-nearby-tab="stations">🚇 MRT/LRT</button>
-          </div>
-          <p class="hint section-gap" id="nearbyStopsHint">Tap a bus number for its route.</p>
-          <div id="nearbyBusStops" class="nearby-list nearby-tab-panel active"></div>
-          <div id="nearbyStations" class="nearby-list nearby-tab-panel"></div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <script src="app.js"></script>

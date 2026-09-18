@@ -1,0 +1,272 @@
+import {
+  LINE_NAMES,
+  getMockTrainAlerts,
+  getMockBusArrivals,
+  getMockStationStatus,
+  ALTERNATE_ROUTE_HINTS,
+  MOCK_BUS_STOPS,
+  MRT_STATIONS,
+} from "./mockData.js";
+import { normalizeLine } from "./lineCodes.js";
+
+const BASE_URL = "https://datamall2.mytransport.sg/ltaodataservice";
+
+function hasRealKey() {
+  return Boolean(process.env.LTA_ACCOUNT_KEY);
+}
+
+async function ltaFetch(path) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      AccountKey: process.env.LTA_ACCOUNT_KEY,
+      accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`LTA DataMall request failed: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/**
+ * Returns an array of normalized train alert objects, whether from the real
+ * TrainServiceAlerts endpoint or from mock data. Falls back to mock data
+ * automatically on any live-API error so a demo never hard-fails.
+ */
+export async function getTrainAlerts() {
+  if (!hasRealKey()) return { source: "mock", alerts: getMockTrainAlerts() };
+
+  try {
+    const data = await ltaFetch("/TrainServiceAlerts");
+    const value = data?.value;
+    if (!value || value.Status === 1) {
+      // Status 1 = normal service, no active disruptions
+      return { source: "live", alerts: [] };
+    }
+    const alerts = (value.AffectedSegments || []).map((seg) => {
+      const line = normalizeLine(seg.Line);
+      return {
+      line,
+      lineName: LINE_NAMES[line] || line,
+      status: "disrupted",
+      severity: "unknown",
+      direction: seg.Direction || null,
+      affectedStations: (seg.Stations || "").split(",").map((s) => s.trim()).filter(Boolean),
+      message: value.Message?.[0]?.Content || "Service disruption reported.",
+      freeBusBridging: seg.FreeBus === "1" || seg.FreeBus === 1,
+      freeShuttle: seg.FreeMRT === "1" || seg.FreeMRT === 1,
+      updatedAt: value.Message?.[0]?.CreatedDate || new Date().toISOString(),
+      };
+    });
+    return { source: "live", alerts };
+  } catch (err) {
+    console.error("[ltaClient] live train alerts failed, using mock:", err.message);
+    return { source: "mock-fallback", alerts: getMockTrainAlerts() };
+  }
+}
+
+export async function getBusArrivals(busStopCode) {
+  if (!hasRealKey()) return { source: "mock", ...getMockBusArrivals(busStopCode) };
+
+  try {
+    const data = await ltaFetch(`/v3/BusArrival?BusStopCode=${encodeURIComponent(busStopCode)}`);
+    const services = (data.Services || []).map((svc) => {
+      const toMins = (iso) =>
+        iso ? Math.max(0, Math.round((new Date(iso) - Date.now()) / 60000)) : null;
+      return {
+        serviceNo: svc.ServiceNo,
+        nextArrivalMins: toMins(svc.NextBus?.EstimatedArrival),
+        nextArrival2Mins: toMins(svc.NextBus2?.EstimatedArrival),
+        load: svc.NextBus?.Load || "unknown",
+      };
+    });
+    return {
+      source: "live",
+      busStopCode,
+      description: data.BusStopCode ? `Stop ${data.BusStopCode}` : "Unknown stop",
+      services,
+    };
+  } catch (err) {
+    console.error("[ltaClient] live bus arrivals failed, using mock:", err.message);
+    return { source: "mock-fallback", ...getMockBusArrivals(busStopCode) };
+  }
+}
+
+/**
+ * Alternate-route suggestions. There's no single official "give me an
+ * alternate route" LTA endpoint, so this combines whatever active
+ * disruptions exist with a small hint table. In a longer build this is the
+ * natural place to call the OneMap routing API instead.
+ */
+export async function getAlternateRoutes({ from, to }) {
+  const { alerts } = await getTrainAlerts();
+  const relevant = alerts.filter((a) => a.status === "disrupted");
+  const hints = ALTERNATE_ROUTE_HINTS.filter((h) =>
+    relevant.some((a) => a.line === h.disruptedLine)
+  );
+  return {
+    from,
+    to,
+    activeDisruptionsConsidered: relevant.map((a) => `${a.line}: ${a.message}`),
+    suggestions: hints.length
+      ? hints.map((h) => h.suggestion)
+      : ["No active disruptions affecting known routes — the direct route should be fine."],
+  };
+}
+
+export async function getStationStatus(stationName) {
+  // Real crowd-density API exists (PCDRealTime) but needs per-line polling;
+  // mock is used here for both modes to keep the one-day scope tight.
+  return getMockStationStatus(stationName);
+}
+
+/**
+ * PCDForecast — 30-min crowd buckets for one line, at one station. Real
+ * shape (verified against a live call): value[] is one entry per day, each
+ * with a Stations[] list, each station carrying its own Interval[] of
+ * { Start, CrowdLevel }. `trainLineCode` must be the crowd-density code
+ * (e.g. "PLRT"), which differs from TrainServiceAlerts' code (e.g. "PTL")
+ * for the same physical line — see lineCodes.js.
+ */
+export async function getStationCrowdForecast(trainLineCode, stationCode) {
+  if (!hasRealKey()) return [];
+  try {
+    const data = await ltaFetch(`/PCDForecast?TrainLine=${trainLineCode}`);
+    const dayRecord = (data?.value ?? [])[0];
+    const station =
+      dayRecord?.Stations?.find((s) => s.Station === stationCode) ?? dayRecord?.Stations?.[0];
+    return (station?.Interval ?? []).map((entry) => ({
+      time: entry.Start.slice(11, 16), // "HH:MM" — sliced directly from the +08:00 SGT string
+      crowdLevel: String(entry.CrowdLevel).toLowerCase(),
+    }));
+  } catch (err) {
+    console.error("[ltaClient] crowd forecast failed:", err.message);
+    return [];
+  }
+}
+
+export function getAllStations() {
+  return MRT_STATIONS;
+}
+
+export function findStationByName(name) {
+  const needle = name.trim().toLowerCase();
+  return MRT_STATIONS.find((s) => s.name.toLowerCase() === needle) || null;
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function nearest(points, lat, lng, limit) {
+  return points
+    .map((p) => ({ ...p, distanceKm: haversineKm(lat, lng, p.latitude, p.longitude) }))
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, limit);
+}
+
+// Cached for the process lifetime — LTA's own BusStops dataset changes rarely
+// enough that re-fetching all ~5000 stops on every request would just waste
+// quota. Upgrade path: refresh on a long interval if stops ever go stale.
+let busStopsCache = null;
+
+async function fetchAllBusStops() {
+  if (busStopsCache) return busStopsCache;
+  const stops = [];
+  for (let skip = 0; ; skip += 500) {
+    const data = await ltaFetch(`/BusStops?$skip=${skip}`);
+    const page = data.value || [];
+    stops.push(
+      ...page.map((s) => ({
+        busStopCode: s.BusStopCode,
+        description: s.Description,
+        latitude: s.Latitude,
+        longitude: s.Longitude,
+      }))
+    );
+    if (page.length < 500) break;
+  }
+  busStopsCache = stops;
+  return stops;
+}
+
+// Cached like fetchAllBusStops — BusRoutes rarely changes, so pay the ~30
+// paged calls once per process lifetime rather than per request.
+let busRoutesCache = null;
+
+async function fetchAllBusRoutes() {
+  if (busRoutesCache) return busRoutesCache;
+  const routes = [];
+  for (let skip = 0; ; skip += 500) {
+    const data = await ltaFetch(`/BusRoutes?$skip=${skip}`);
+    const page = data.value || [];
+    routes.push(...page);
+    if (page.length < 500) break;
+  }
+  busRoutesCache = routes;
+  return routes;
+}
+
+/**
+ * All stops for one bus service, in sequence, for its lowest-numbered
+ * direction (most services only have one; a handful loop and have two —
+ * not disambiguated here, out of scope for a "show me the route" view).
+ */
+export async function getBusRouteStops(serviceNo) {
+  if (!hasRealKey()) return { source: "mock", serviceNo, stops: [] };
+  try {
+    const [routes, stops] = await Promise.all([fetchAllBusRoutes(), fetchAllBusStops()]);
+    const stopMap = new Map(stops.map((s) => [s.busStopCode, s]));
+    const direction = Math.min(
+      ...routes.filter((r) => r.ServiceNo === serviceNo).map((r) => r.Direction)
+    );
+    const sequence = routes
+      .filter((r) => r.ServiceNo === serviceNo && r.Direction === direction)
+      .sort((a, b) => a.StopSequence - b.StopSequence)
+      .map((r) => {
+        const info = stopMap.get(r.BusStopCode);
+        return {
+          busStopCode: r.BusStopCode,
+          sequence: r.StopSequence,
+          description: info?.description || "Unknown stop",
+          latitude: info?.latitude ?? null,
+          longitude: info?.longitude ?? null,
+        };
+      });
+    return { source: "live", serviceNo, stops: sequence };
+  } catch (err) {
+    console.error("[ltaClient] bus route stops failed:", err.message);
+    return { source: "mock-fallback", serviceNo, stops: [] };
+  }
+}
+
+export async function getNearbyStations(lat, lng, limit = 5) {
+  return { source: "static-reference", stations: nearest(MRT_STATIONS, lat, lng, limit) };
+}
+
+export async function getNearbyBusStops(lat, lng, limit = 5) {
+  let stops;
+  let source = "live";
+  try {
+    if (!hasRealKey()) throw new Error("no LTA_ACCOUNT_KEY set");
+    stops = nearest(await fetchAllBusStops(), lat, lng, limit);
+  } catch (err) {
+    if (hasRealKey()) console.error("[ltaClient] live bus stops failed, using mock:", err.message);
+    source = hasRealKey() ? "mock-fallback" : "mock";
+    stops = nearest(MOCK_BUS_STOPS, lat, lng, limit);
+  }
+
+  const withArrivals = await Promise.all(
+    stops.map(async (stop) => {
+      const arrivals = await getBusArrivals(stop.busStopCode);
+      return { ...stop, services: arrivals.services };
+    })
+  );
+  return { source, busStops: withArrivals };
+}

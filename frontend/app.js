@@ -366,10 +366,10 @@ function renderNearList() {
           ${pathSvg(ICON.bus, { size: 30, stroke: "#1f8a57", width: 1.6 })}
           <span class="stop-row-text">
             <span class="stop-row-name">${s.description}</span>
-            <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.services.length} bus${s.services.length === 1 ? "" : "es"}</span>
+            <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.services.length ? `${s.services.length} bus${s.services.length === 1 ? "" : "es"}` : "no live arrivals"}</span>
           </span>
           <span class="stop-row-eta">
-            <span class="stop-row-eta-mins">${s.services[0]?.nextArrivalMins ?? "?"}m</span>
+            <span class="stop-row-eta-mins">${s.services[0]?.nextArrivalMins != null ? `${s.services[0].nextArrivalMins}m` : "–"}</span>
             <span class="stop-row-eta-arrow">&rarr;</span>
           </span>
         </button>`
@@ -425,10 +425,10 @@ function openStop(idx) {
       (svc) => `<button class="bus-row" data-service="${svc.serviceNo}">
         <span class="bus-badge-no">${svc.serviceNo}</span>
         <span class="bus-row-text">
-          <span class="bus-row-dest">Next in ${svc.nextArrivalMins ?? "?"} min</span>
+          <span class="bus-row-dest">${svc.nextArrivalMins != null ? `Next in ${svc.nextArrivalMins} min` : "No live estimate"}</span>
           <span class="bus-row-meta"><span class="crowd-dot" style="background:${LOAD_COLOR[svc.load] || "#6f7378"}"></span><span>${LOAD_LABEL[svc.load] || "Unknown load"}${svc.nextArrival2Mins != null ? ` · then ${svc.nextArrival2Mins}m` : ""}</span></span>
         </span>
-        <span class="bus-row-eta">${svc.nextArrivalMins ?? "?"}m</span>
+        <span class="bus-row-eta">${svc.nextArrivalMins != null ? `${svc.nextArrivalMins}m` : "–"}</span>
       </button>`
     )
     .join("") || `<div class="hint-text">No live arrivals at this stop.</div>`;

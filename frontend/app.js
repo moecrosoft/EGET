@@ -21,6 +21,16 @@ const ICON = {
 
 const MODE_ICON = { CYCLE: ICON.bike, WALK: ICON.walk, BUS: ICON.bus, RAIL: ICON.train, SUBWAY: ICON.train };
 const MODE_COLOR = { CYCLE: "#a8acb2", WALK: "#8b9088", BUS: "#1f8a57", RAIL: "#9e28b5", SUBWAY: "#9e28b5" };
+// Official Singapore rail-line colors (LTA network map).
+const LINE_COLORS = {
+  NS: "#d42e12", EW: "#009645", CG: "#009645", NE: "#9900aa",
+  CC: "#fa9e0d", CE: "#fa9e0d", DT: "#005ec4", TE: "#9d5b25",
+  BP: "#748477", SE: "#748477", SW: "#748477", PE: "#748477", PW: "#748477",
+};
+function legColor(leg) {
+  if ((leg.mode === "RAIL" || leg.mode === "SUBWAY") && LINE_COLORS[leg.route]) return LINE_COLORS[leg.route];
+  return MODE_COLOR[leg.mode] || "#8791ab";
+}
 const CROWD_COLOR = { l: "#4fbe8b", m: "#e0a93a", h: "#e2605a" };
 const LOAD_COLOR = { SEA: "#4fbe8b", SDA: "#e0a93a", LSD: "#e2605a" };
 const LOAD_LABEL = { SEA: "Seats", SDA: "Standing", LSD: "Packed" };
@@ -71,12 +81,12 @@ function initMaps() {
   navLayer = L.layerGroup().addTo(navMap);
 }
 
-const LEG_MAP_STYLE = (leg) => ({ color: MODE_COLOR[leg.mode] || "#8791ab", weight: 4 });
+const LEG_MAP_STYLE = (leg) => ({ color: legColor(leg), weight: 4 });
 
 function routeBadgeIcon(leg) {
   const label = leg.route || (leg.mode === "BUS" ? "Bus" : leg.mode === "RAIL" || leg.mode === "SUBWAY" ? "MRT" : "");
   if (!label) return null;
-  const color = MODE_COLOR[leg.mode] || "#8791ab";
+  const color = legColor(leg);
   return L.divIcon({ className: "", html: `<span class="route-line-badge" style="background:${color}">${label}</span>`, iconSize: [0, 0] });
 }
 function transferDotIcon(color) {
@@ -101,7 +111,7 @@ function plotLegs(map, layer, legs, { fit = true } = {}) {
     }
     if (i < arr.length - 1) {
       const junction = leg.coordinates[leg.coordinates.length - 1];
-      L.marker(junction, { icon: transferDotIcon(MODE_COLOR[leg.mode] || "#8791ab"), interactive: false }).addTo(layer);
+      L.marker(junction, { icon: transferDotIcon(legColor(leg)), interactive: false }).addTo(layer);
     }
   });
   // Deferred: callers plot a route and switch screens in the same tick, so
@@ -175,7 +185,7 @@ function legModeLabel(leg) {
 function legCard(leg, isLast) {
   const mins = leg.durationSeconds != null ? Math.round(leg.durationSeconds / 60) : "–";
   const label = legModeLabel(leg);
-  const color = MODE_COLOR[leg.mode] || "#8791ab";
+  const color = legColor(leg);
   const changeFlag = !isLast && leg.to ? `<span class="leg-flag">Change at ${leg.to}</span>` : "";
   return `<div class="leg-card">
     ${pathSvg(MODE_ICON[leg.mode] || ICON.walk, { size: 26, stroke: color, width: 1.6 })}
@@ -235,7 +245,7 @@ function renderBoardCustom(route) {
   $("boardOptionRow").innerHTML = options
     .map(
       (o) => `<button class="near-mode-tab${o.id === selected.id ? " active" : ""}" data-option="${o.id}">
-        ${o.mode} · ${Math.round(o.totalTimeSeconds / 60)}m
+        ${o.label || o.mode} · ${Math.round(o.totalTimeSeconds / 60)}m
       </button>`
     )
     .join("");

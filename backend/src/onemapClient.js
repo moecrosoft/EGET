@@ -56,32 +56,7 @@ export async function getWalkCycleRoute(start, end, routeType) {
   };
 }
 
-/**
- * routeType "pt" — public transport itinerary. `mode` is "TRANSIT", "BUS" or
- * "RAIL". Returns the first (best) itinerary, normalized to a flat leg list
- * with decoded geometry, or null if no route was found.
- */
-export async function getPtRoute(start, end, { mode, date, time, maxWalkDistance = 1000 }) {
-  let data;
-  try {
-    data = await callOneMap({
-      start: toLatLng(start),
-      end: toLatLng(end),
-      routeType: "pt",
-      mode,
-      date,
-      time,
-      maxWalkDistance: String(maxWalkDistance),
-      numItineraries: "1",
-    });
-  } catch (err) {
-    console.error(`[onemapClient] pt route (${mode}) failed:`, err.message);
-    return null;
-  }
-
-  const itinerary = data?.plan?.itineraries?.[0];
-  if (!itinerary) return null;
-
+function normalizeItinerary(itinerary) {
   return {
     totalTimeSeconds: itinerary.duration,
     transfers: itinerary.transfers,
@@ -96,6 +71,39 @@ export async function getPtRoute(start, end, { mode, date, time, maxWalkDistance
       coordinates: leg.legGeometry?.points ? decodePolyline(leg.legGeometry.points) : [],
     })),
   };
+}
+
+/**
+ * routeType "pt" — public transport itineraries. `mode` is "TRANSIT", "BUS"
+ * or "RAIL". Returns every itinerary OneMap comes back with (up to
+ * numItineraries), normalized to a flat leg list with decoded geometry —
+ * lets a caller pick between e.g. the fastest one and the one with fewest
+ * transfers, instead of only ever seeing OneMap's single top pick.
+ */
+export async function getPtItineraries(start, end, { mode, date, time, maxWalkDistance = 1000, numItineraries = 1 }) {
+  let data;
+  try {
+    data = await callOneMap({
+      start: toLatLng(start),
+      end: toLatLng(end),
+      routeType: "pt",
+      mode,
+      date,
+      time,
+      maxWalkDistance: String(maxWalkDistance),
+      numItineraries: String(numItineraries),
+    });
+  } catch (err) {
+    console.error(`[onemapClient] pt route (${mode}) failed:`, err.message);
+    return [];
+  }
+  return (data?.plan?.itineraries || []).map(normalizeItinerary);
+}
+
+/** Single-itinerary convenience wrapper — OneMap's top pick, or null. */
+export async function getPtRoute(start, end, opts) {
+  const [itinerary] = await getPtItineraries(start, end, { ...opts, numItineraries: 1 });
+  return itinerary || null;
 }
 
 const SEARCH_BASE = "https://www.onemap.gov.sg/api/common/elastic/search";

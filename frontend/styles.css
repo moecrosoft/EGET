@@ -394,7 +394,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 230px;
+  height: 25vh;
   overflow: hidden;
   z-index: 15;
 }

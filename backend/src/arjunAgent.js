@@ -3,8 +3,15 @@ import { toolDefinitions, executeTool } from "./tools.js";
 import { getJourneyOptions } from "./journeyPlanner.js";
 import { respondToCommuterSchema, respondToCommuterJsonSchema } from "./schemas.js";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+
+// Constructed lazily (not at module load) so that `new Groq(...)` only runs
+// once GROQ_API_KEY has actually been loaded into process.env — see
+// backend/server.js for why module-load-time construction is unsafe.
+let _groq;
+function getGroq() {
+  return (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY }));
+}
 
 const SYSTEM_PROMPT = `You are Commute Companion, tailored for Arjun: a multi-modal, flexible-start
 commuter travelling Punggol -> one-north. He can cycle to Punggol interchange and take the
@@ -108,7 +115,7 @@ export async function chatWithArjunAgent({ message, history = [] }) {
   ];
 
   for (let turn = 0; turn < 6; turn++) {
-    const response = await groq.chat.completions.create({
+    const response = await getGroq().chat.completions.create({
       model: MODEL,
       max_tokens: 1024,
       tools: GROQ_TOOLS,
@@ -117,6 +124,15 @@ export async function chatWithArjunAgent({ message, history = [] }) {
 
     const responseMessage = response.choices[0].message;
     const toolCalls = responseMessage.tool_calls || [];
+    // Reconstruct a minimal plain object instead of pushing the raw SDK
+    // response message back into the conversation — the Groq SDK's message
+    // object may carry extra fields (e.g. `reasoning`, `executed_tools`)
+    // that some OpenAI-compatible backends don't tolerate being echoed back.
+    const assistantTurn = {
+      role: "assistant",
+      content: responseMessage.content,
+      tool_calls: responseMessage.tool_calls,
+    };
 
     const finalCall = toolCalls.find((c) => c.function.name === RESPOND_TOOL_NAME);
     if (finalCall) {
@@ -127,7 +143,7 @@ export async function chatWithArjunAgent({ message, history = [] }) {
       // Model produced only text with turns still remaining — nudge it back
       // toward tool use / the final structured answer on the next turn by
       // just continuing the loop with its text appended to history.
-      conversation.push(responseMessage);
+      conversation.push(assistantTurn);
       conversation.push({
         role: "user",
         content:
@@ -136,7 +152,7 @@ export async function chatWithArjunAgent({ message, history = [] }) {
       continue;
     }
 
-    conversation.push(responseMessage);
+    conversation.push(assistantTurn);
 
     const toolResultMessages = await Promise.all(
       toolCalls.map(async (call) => {
@@ -154,7 +170,7 @@ export async function chatWithArjunAgent({ message, history = [] }) {
   }
 
   // Turn cap reached without a respond_to_commuter call — force it.
-  const forcedResponse = await groq.chat.completions.create({
+  const forcedResponse = await getGroq().chat.completions.create({
     model: MODEL,
     max_tokens: 1024,
     tools: GROQ_TOOLS,

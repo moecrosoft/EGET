@@ -32,6 +32,7 @@ import {
   findStationByName,
   searchStations,
   getBusRouteStops,
+  getTrafficIncidents,
 } from "./src/ltaClient.js";
 import { searchPlaces } from "./src/onemapClient.js";
 import { getWeather } from "./src/weatherClient.js";
@@ -77,6 +78,14 @@ app.get("/api/weather", async (_req, res) => {
 app.get("/api/alerts", async (_req, res) => {
   try {
     res.json(await getTrainAlerts());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/incidents", async (_req, res) => {
+  try {
+    res.json(await getTrafficIncidents());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

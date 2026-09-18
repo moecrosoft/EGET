@@ -17,6 +17,7 @@ const ICON = {
   walk: "M13 8l-3 4 2 3-1 5M13 8l3 3 2 1M10 12l-3 2M12.6 4.6h.01",
   rain: "M7 13.5a4 4 0 013-6.4 5 5 0 019 2.4 3 3 0 01-1 6H9M8.5 19l-1 2M12.5 19l-1 2M16.5 19l-1 2",
   sun: "M12 5V3M12 21v-2M5 12H3M21 12h-2M6.4 6.4L5 5M19 19l-1.4-1.4M17.6 6.4L19 5M5 19l1.4-1.4M8.5 12a3.5 3.5 0 107 0 3.5 3.5 0 10-7 0",
+  warning: "M12 3l9 16H3zM12 10v4M12 17h.01",
 };
 
 const MODE_ICON = { CYCLE: ICON.bike, WALK: ICON.walk, BUS: ICON.bus, RAIL: ICON.train, SUBWAY: ICON.train };
@@ -31,6 +32,17 @@ const LINE_COLORS = {
 function legColor(leg) {
   if ((leg.mode === "RAIL" || leg.mode === "SUBWAY") && LINE_COLORS[leg.route]) return LINE_COLORS[leg.route];
   return MODE_COLOR[leg.mode] || "#8791ab";
+}
+// OneMap's 2-letter line codes (leg.route) vs LTA TrainServiceAlerts' own
+// 3-letter codes (alert.line) — different vocabularies for the same lines.
+const LINE_ALERT_CODE = { NS: "NSL", EW: "EWL", CG: "EWL", NE: "NEL", CC: "CCL", CE: "CCL", DT: "DTL", TE: "TEL" };
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 const CROWD_COLOR = { l: "#4fbe8b", m: "#e0a93a", h: "#e2605a" };
 const LOAD_COLOR = { SEA: "#4fbe8b", SDA: "#e0a93a", LSD: "#e2605a" };
@@ -295,9 +307,10 @@ async function refreshJourney() {
 $("tripBar").onclick = () => showScreen("plan");
 
 // ============================= Navigation =============================
-let navAlternative = null; // { mode, legs } — a non-cycling option to offer if it starts raining
-let navRainCardShown = false;
-let navWeatherPoll = null;
+let navAlternative = null; // { mode, legs } — the other option, offered as a swap if something disrupts the current one
+let navCurrentLegs = [];
+let navDisruptionShown = false;
+let navDisruptionPoll = null;
 
 function optionTotalMinutes(option) {
   if (option.totalTimeSeconds != null) return Math.round(option.totalTimeSeconds / 60);
@@ -307,6 +320,7 @@ function optionTotalMinutes(option) {
 
 function startNav(option, leaveTime, arriveTime, alternative) {
   const legs = option.legs || [];
+  navCurrentLegs = legs;
   const current = legs[0];
   const next = legs[1];
   $("navModeIcon").querySelector("path").setAttribute("d", MODE_ICON[current?.mode] || ICON.walk);
@@ -319,45 +333,88 @@ function startNav(option, leaveTime, arriveTime, alternative) {
     : "Last leg of the trip";
   $("navArrive").textContent = arriveTime;
 
-  // Only worth offering a rain swap if this route is weather-exposed (cycling)
-  // and there's a non-cycling alternative to fall back to.
-  const exposedToRain = legs.some((l) => l.mode === "CYCLE");
-  navAlternative = exposedToRain && alternative && !(alternative.legs || []).some((l) => l.mode === "CYCLE") ? alternative : null;
-  navRainCardShown = false;
+  navAlternative = alternative || null;
+  navDisruptionShown = false;
   $("navRainCard").hidden = true;
 
   plotLegs(navMap, navLayer, legs);
   showScreen("nav");
-  startNavWeatherPoll();
+  startNavDisruptionPoll();
 }
 
-function stopNavWeatherPoll() {
-  clearInterval(navWeatherPoll);
-  navWeatherPoll = null;
+function stopNavDisruptionPoll() {
+  clearInterval(navDisruptionPoll);
+  navDisruptionPoll = null;
 }
 
-function startNavWeatherPoll() {
-  stopNavWeatherPoll();
+// Finds a live LTA traffic incident (accident, breakdown, roadworks) that
+// falls within ~300m of any point on a BUS leg's path.
+function incidentOnRoute(legs, incidents) {
+  const busLegs = legs.filter((l) => l.mode === "BUS" && l.coordinates?.length);
+  for (const incident of incidents) {
+    for (const leg of busLegs) {
+      if (leg.coordinates.some(([lat, lng]) => haversineMeters(lat, lng, incident.latitude, incident.longitude) < 300)) {
+        return incident;
+      }
+    }
+  }
+  return null;
+}
+
+// Finds a live LTA train-service alert for whichever rail line a RAIL/SUBWAY
+// leg of this trip actually rides.
+function disruptedAlertForRoute(legs, alerts) {
+  for (const leg of legs) {
+    if (leg.mode !== "RAIL" && leg.mode !== "SUBWAY") continue;
+    const code = LINE_ALERT_CODE[leg.route];
+    if (!code) continue;
+    const alert = alerts.find((a) => a.line === code);
+    if (alert) return alert;
+  }
+  return null;
+}
+
+function startNavDisruptionPoll() {
+  stopNavDisruptionPoll();
   if (!navAlternative) return;
   const check = async () => {
-    if (navRainCardShown || !navAlternative) return;
+    if (navDisruptionShown || !navAlternative) return;
     try {
-      const res = await fetch(`${API}/api/weather`);
-      const weather = await res.json();
-      if (weather.isRainingNow) showNavRainCard(weather);
+      // Rain only matters if this trip is actually exposed to it (cycling),
+      // and only worth a swap if the alternative isn't cycling too.
+      if (navCurrentLegs.some((l) => l.mode === "CYCLE") && !(navAlternative.legs || []).some((l) => l.mode === "CYCLE")) {
+        const weather = await (await fetch(`${API}/api/weather`)).json();
+        if (weather.isRainingNow) {
+          return showDisruptionCard("It's raining", `${weather.nowcast} at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`);
+        }
+      }
+      if (navCurrentLegs.some((l) => (l.mode === "RAIL" || l.mode === "SUBWAY") && LINE_ALERT_CODE[l.route])) {
+        const { alerts } = await (await fetch(`${API}/api/alerts`)).json();
+        const alert = disruptedAlertForRoute(navCurrentLegs, alerts);
+        if (alert) {
+          return showDisruptionCard(`${alert.lineName} disrupted`, `${alert.message} Swap to ${navAlternative.mode} instead — arrives around the same time.`, ICON.train);
+        }
+      }
+      if (navCurrentLegs.some((l) => l.mode === "BUS")) {
+        const { incidents } = await (await fetch(`${API}/api/incidents`)).json();
+        const incident = incidentOnRoute(navCurrentLegs, incidents);
+        if (incident) {
+          return showDisruptionCard("Accident on your route", `${incident.message} Swap to ${navAlternative.mode} to avoid it — arrives around the same time.`, ICON.warning);
+        }
+      }
     } catch {
       // silently skip this poll — try again next interval
     }
   };
   check();
-  navWeatherPoll = setInterval(check, 60000);
+  navDisruptionPoll = setInterval(check, 60000);
 }
 
-function showNavRainCard(weather) {
-  navRainCardShown = true;
-  $("navRainCardTitle").textContent = "It's raining";
-  $("navRainCardBody").textContent =
-    `${weather.nowcast} at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`;
+function showDisruptionCard(title, body, icon = ICON.rain) {
+  navDisruptionShown = true;
+  $("navRainCardIconPath").setAttribute("d", icon);
+  $("navRainCardTitle").textContent = title;
+  $("navRainCardBody").textContent = body;
   $("navSwapBtn").textContent = `Swap to ${navAlternative.mode}`;
   $("navRainCard").hidden = false;
 }
@@ -372,11 +429,11 @@ $("navKeepGoingBtn").onclick = () => {
 };
 
 $("navPlanBtn").onclick = () => {
-  stopNavWeatherPoll();
+  stopNavDisruptionPoll();
   showScreen("board");
 };
 $("navEndBtn").onclick = () => {
-  stopNavWeatherPoll();
+  stopNavDisruptionPoll();
   showScreen("board");
 };
 

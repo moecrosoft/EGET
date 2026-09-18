@@ -65,6 +65,29 @@ export async function getTrainAlerts() {
   }
 }
 
+/**
+ * Real-time road incidents (accidents, breakdowns, roadworks) island-wide,
+ * each with a lat/lng — used to check whether one falls on a bus leg's path
+ * during nav, so we can prompt a swap. No mock fallback: without a real key
+ * there's nothing meaningful to show, so it's just an empty list.
+ */
+export async function getTrafficIncidents() {
+  if (!hasRealKey()) return { source: "mock", incidents: [] };
+  try {
+    const data = await ltaFetch("/TrafficIncidents");
+    const incidents = (data.value || []).map((i) => ({
+      type: i.Type,
+      message: i.Message,
+      latitude: i.Latitude,
+      longitude: i.Longitude,
+    }));
+    return { source: "live", incidents };
+  } catch (err) {
+    console.error("[ltaClient] traffic incidents failed:", err.message);
+    return { source: "mock-fallback", incidents: [] };
+  }
+}
+
 export async function getBusArrivals(busStopCode) {
   if (!hasRealKey()) return { source: "mock", ...getMockBusArrivals(busStopCode) };
 

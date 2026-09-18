@@ -224,3 +224,6 @@ __marimo__/
 
 # git worktrees (local, not shared)
 # .worktrees/
+
+# Node (backend/, frontend/, api/ all install their own)
+node_modules/

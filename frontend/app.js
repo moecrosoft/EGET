@@ -446,6 +446,34 @@ function findNearby() {
   );
 }
 
+// ============================= AI playground (dev) =============================
+const AI_BODY = {
+  "generate-text": { prompt: "Recommend a route from Punggol to one-north" },
+  "generate-image": { prompt: "a map icon" },
+  embeddings: { input: "Punggol Field station" },
+  chat: { messages: [{ role: "user", content: "Is my route affected today?" }] },
+};
+
+document.querySelectorAll(".ai-btn").forEach((btn) => {
+  btn.onclick = async () => {
+    const route = btn.dataset.aiRoute;
+    const out = $("aiPlaygroundResult");
+    out.hidden = false;
+    out.textContent = "Loading…";
+    try {
+      const res = await fetch(`${API}/api/ai/${route}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(AI_BODY[route]),
+      });
+      const data = await res.json();
+      out.textContent = `${res.status} ${res.statusText}\n${JSON.stringify(data, null, 2)}`;
+    } catch (err) {
+      out.textContent = "Error: " + err.message;
+    }
+  };
+});
+
 // ============================= Clock + boot =============================
 function tickClock() {
   $("clock").textContent = nowClock();

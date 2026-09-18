@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import {
   getTrainAlerts,
@@ -24,6 +25,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// api/ is CommonJS (require/module.exports), unlike the rest of this ESM
+// backend — createRequire bridges the two so its placeholder AI routes
+// (generate-text, generate-image, embeddings, chat) are reachable at /api/ai/*.
+const require = createRequire(import.meta.url);
+app.use("/api", require(path.join(__dirname, "..", "api", "index.js")));
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(

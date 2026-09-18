@@ -96,6 +96,17 @@
         </div>
 
         <button id="boardLeaveNowBtn" class="cta-primary">Leave now</button>
+
+        <div class="ai-playground">
+          <div class="ai-playground-title">AI playground (dev)</div>
+          <div class="ai-playground-buttons">
+            <button class="ai-btn" data-ai-route="generate-text">Generate text</button>
+            <button class="ai-btn" data-ai-route="generate-image">Generate image</button>
+            <button class="ai-btn" data-ai-route="embeddings">Embeddings</button>
+            <button class="ai-btn" data-ai-route="chat">Chat</button>
+          </div>
+          <pre id="aiPlaygroundResult" class="ai-playground-result" hidden></pre>
+        </div>
       </section>
 
       <section class="screen" data-screen="near" id="screen-near">

@@ -1,0 +1,7 @@
+{
+  "name": "eget-api-ai-routes",
+  "private": true,
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}

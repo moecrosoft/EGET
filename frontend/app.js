@@ -447,30 +447,38 @@ function findNearby() {
 }
 
 // ============================= AI playground (dev) =============================
-const AI_BODY = {
-  "generate-text": { prompt: "Recommend a route from Punggol to one-north" },
-  "generate-image": { prompt: "a map icon" },
-  embeddings: { input: "Punggol Field station" },
-  chat: { messages: [{ role: "user", content: "Is my route affected today?" }] },
+// api/ai.controller.js has no real model behind it yet — every route just echoes
+// a fixed placeholder. Rendered directly here instead of over fetch, so the
+// button always shows that placeholder rather than depending on the backend
+// being up, api/ having its deps installed, or CORS.
+const AI_PLACEHOLDER = {
+  "generate-text": {
+    success: true,
+    message: "Placeholder text response",
+    data: { text: 'Processed text for prompt: "Recommend a route from Punggol to one-north"' },
+  },
+  "generate-image": {
+    success: true,
+    message: "Placeholder image response",
+    data: { url: "https://placeholder.sc/600x400" },
+  },
+  embeddings: {
+    success: true,
+    message: "Placeholder embeddings response",
+    data: { vector: [0.012, -0.045, 0.891, 0.234] },
+  },
+  chat: {
+    success: true,
+    message: "Placeholder chat completion response",
+    data: { role: "assistant", content: "This is a mock chat response." },
+  },
 };
 
 document.querySelectorAll(".ai-btn").forEach((btn) => {
-  btn.onclick = async () => {
-    const route = btn.dataset.aiRoute;
+  btn.onclick = () => {
     const out = $("aiPlaygroundResult");
     out.hidden = false;
-    out.textContent = "Loading…";
-    try {
-      const res = await fetch(`${API}/api/ai/${route}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(AI_BODY[route]),
-      });
-      const data = await res.json();
-      out.textContent = `${res.status} ${res.statusText}\n${JSON.stringify(data, null, 2)}`;
-    } catch (err) {
-      out.textContent = "Error: " + err.message;
-    }
+    out.textContent = JSON.stringify(AI_PLACEHOLDER[btn.dataset.aiRoute], null, 2);
   };
 });
 

@@ -1,6 +1,14 @@
 const API = ""; // same-origin
 const $ = (id) => document.getElementById(id);
 
+// ============================= Theme (light/dark) =============================
+const THEME_KEY = "eget-theme";
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+}
+const savedTheme = localStorage.getItem(THEME_KEY);
+applyTheme(savedTheme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+
 // --- Icon paths, lifted verbatim from the EGET design file ---
 const ICON = {
   bike: "M5 17.5a3 3 0 106 0 3 3 0 10-6 0M13 17.5a3 3 0 106 0 3 3 0 10-6 0M8 17.5l4-8h4M10 9.5h4",
@@ -84,15 +92,12 @@ const MAPS_BY_SCREEN = {
 function showScreen(name) {
   screen = name;
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
-  $("tabbar").hidden = name === "plan" || name === "nav";
-  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $("nearCtaWrap").hidden = name !== "plan";
   (MAPS_BY_SCREEN[name]?.() || []).forEach((m) => m && setTimeout(() => m.invalidateSize(), 0));
   if (name === "near" && nearStops.length === 0) findNearby();
 }
 
-document.querySelectorAll(".tab-btn").forEach((btn) => {
-  btn.onclick = () => showScreen(btn.dataset.tab);
-});
+$("nearCta").onclick = () => showScreen("near");
 
 // ============================= Today (board) =============================
 let journeyData = null;
@@ -422,6 +427,8 @@ $("nearBackBtn").onclick = () => {
   renderNearList();
 };
 
+$("nearHomeBtn").onclick = () => showScreen("plan");
+
 function findNearby() {
   if (!navigator.geolocation) {
     $("nearStopList").innerHTML = `<div class="hint-text">Geolocation isn't supported by this browser.</div>`;
@@ -445,6 +452,40 @@ function findNearby() {
     }
   );
 }
+
+// ============================= AI playground (dev) =============================
+const AI_BODY = {
+  "generate-text": { prompt: "Recommend a route from Punggol to one-north" },
+  "generate-image": { prompt: "a map icon" },
+  embeddings: { input: "Punggol Field station" },
+  chat: { messages: [{ role: "user", content: "Is my route affected today?" }] },
+};
+
+document.querySelectorAll(".ai-btn").forEach((btn) => {
+  btn.onclick = async () => {
+    const route = btn.dataset.aiRoute;
+    const out = $("aiPlaygroundResult");
+    out.hidden = false;
+    out.textContent = "Loading…";
+    try {
+      const res = await fetch(`${API}/api/ai/${route}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(AI_BODY[route]),
+      });
+      const data = await res.json();
+      out.textContent = `${res.status} ${res.statusText}\n${JSON.stringify(data, null, 2)}`;
+    } catch (err) {
+      out.textContent = "Error: " + err.message;
+    }
+  };
+});
+
+$("themeToggle").onclick = () => {
+  const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+};
 
 // ============================= Clock + boot =============================
 function tickClock() {

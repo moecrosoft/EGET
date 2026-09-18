@@ -42,7 +42,13 @@ import aiRouter from "../api/index.js";
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(aiRouter);
+// api/ is its own small ESM package (own package.json/node_modules, since
+// it's a sibling of backend/ rather than nested inside it — Node's ESM
+// resolver won't walk up to backend/node_modules for a sibling directory).
+// Mounted under /api so its routes land at /api/ai/* (generate-text,
+// generate-image, embeddings, chat, and the real Arjun agent at
+// /api/ai/arjun/chat), matching what frontend/app.js's AI playground calls.
+app.use("/api", aiRouter);
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(

@@ -23,6 +23,10 @@
 
     <header class="topbar">
       <div class="brand">EGET</div>
+      <button id="themeToggle" class="theme-toggle" aria-label="Toggle light/dark theme">
+        <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"></path></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path></svg>
+      </button>
       <div class="clock" id="clock">--:--</div>
     </header>
 
@@ -47,6 +51,8 @@
             </div>
           </div>
         </div>
+
+        <button id="planFindBtn" class="cta-primary plan-cta">Find my route</button>
 
         <div class="recents" id="planRecents">
           <button class="recent-row" data-recent="one-north">
@@ -74,8 +80,6 @@
             <span class="recent-arrow">&rarr;</span>
           </button>
         </div>
-
-        <button id="planFindBtn" class="cta-primary plan-cta">Find my route</button>
       </section>
 
       <section class="screen" data-screen="board" id="screen-board">
@@ -96,10 +100,24 @@
         </div>
 
         <button id="boardLeaveNowBtn" class="cta-primary">Leave now</button>
+
+        <div class="ai-playground">
+          <div class="ai-playground-title">AI playground (dev)</div>
+          <div class="ai-playground-buttons">
+            <button class="ai-btn" data-ai-route="generate-text">Generate text</button>
+            <button class="ai-btn" data-ai-route="generate-image">Generate image</button>
+            <button class="ai-btn" data-ai-route="embeddings">Embeddings</button>
+            <button class="ai-btn" data-ai-route="chat">Chat</button>
+          </div>
+          <pre id="aiPlaygroundResult" class="ai-playground-result" hidden></pre>
+        </div>
       </section>
 
       <section class="screen" data-screen="near" id="screen-near">
         <div id="nearList" class="near-level">
+          <button id="nearHomeBtn" class="back-row">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
+          </button>
           <div class="near-title">Stops near you</div>
           <div id="nearMap" class="map-panel map-near"></div>
           <div class="near-caption">Live arrivals from LTA, refreshed on open</div>
@@ -149,16 +167,13 @@
       </section>
     </main>
 
-    <nav class="tabbar" id="tabbar">
-      <button class="tab-btn active" data-tab="board">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7M6 10v10h12V10"></path></svg>
-        <span>Today</span>
+    <div class="near-cta-wrap" id="nearCtaWrap">
+      <button class="near-cta" id="nearCta" aria-label="Near you – bus stops">
+        <svg class="near-cta-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+        <span class="near-cta-title">Near you</span>
+        <span class="near-cta-sub">Bus stops</span>
       </button>
-      <button class="tab-btn" data-tab="near">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM9.5 10a2.5 2.5 0 105 0 2.5 2.5 0 10-5 0"></path></svg>
-        <span>Near you</span>
-      </button>
-    </nav>
+    </div>
   </div>
 
   <script src="app.js"></script>

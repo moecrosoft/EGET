@@ -225,6 +225,6 @@ __marimo__/
 # git worktrees (local, not shared)
 .worktrees/
 
-# Node.js
+# Node (backend/, frontend/, api/ all install their own)
 node_modules/
 npm-debug.log*

@@ -73,15 +73,48 @@ function initMaps() {
 
 const LEG_MAP_STYLE = (leg) => ({ color: MODE_COLOR[leg.mode] || "#8791ab", weight: 4 });
 
+function routeBadgeIcon(leg) {
+  const label = leg.route || (leg.mode === "BUS" ? "Bus" : leg.mode === "RAIL" || leg.mode === "SUBWAY" ? "MRT" : "");
+  if (!label) return null;
+  const color = MODE_COLOR[leg.mode] || "#8791ab";
+  return L.divIcon({ className: "", html: `<span class="route-line-badge" style="background:${color}">${label}</span>`, iconSize: [0, 0] });
+}
+function transferDotIcon(color) {
+  return L.divIcon({ className: "", html: `<div class="eget-transfer-dot" style="border-color:${color}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] });
+}
+
+// Plots each leg in its mode's color, a route-number badge (like Google
+// Maps' bus/line pill) at the midpoint of transit legs, and a dot at every
+// change-over point so a multi-leg trip reads as a sequence of legs on the
+// map, not just one long line.
 function plotLegs(map, layer, legs, { fit = true } = {}) {
   layer.clearLayers();
   const bounds = [];
-  (legs || []).forEach((leg) => {
+  (legs || []).forEach((leg, i, arr) => {
     if (!leg.coordinates || leg.coordinates.length < 2) return;
     L.polyline(leg.coordinates, LEG_MAP_STYLE(leg)).addTo(layer);
     bounds.push(...leg.coordinates);
+
+    if (leg.mode === "BUS" || leg.mode === "RAIL" || leg.mode === "SUBWAY") {
+      const icon = routeBadgeIcon(leg);
+      if (icon) L.marker(leg.coordinates[Math.floor(leg.coordinates.length / 2)], { icon, interactive: false }).addTo(layer);
+    }
+    if (i < arr.length - 1) {
+      const junction = leg.coordinates[leg.coordinates.length - 1];
+      L.marker(junction, { icon: transferDotIcon(MODE_COLOR[leg.mode] || "#8791ab"), interactive: false }).addTo(layer);
+    }
   });
-  if (fit && bounds.length) map.fitBounds(bounds, { padding: [20, 20] });
+  // Deferred: callers plot a route and switch screens in the same tick, so
+  // the map's container can still be display:none (0x0) right here — fitting
+  // bounds against that produces a bogus zoom. By the time this timeout
+  // fires, the screen-switch that already happened synchronously has made
+  // the container visible, so invalidateSize sees its real size.
+  if (fit && bounds.length) {
+    setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }, 0);
+  }
   return bounds;
 }
 

@@ -1,111 +1,125 @@
-# Arjun Data & Decision Service — PS2 Smart Commuter Companion
+# EGET — Smart Commuter Companion
 
-This is the data integration and disruption/decision-logic component of our PS2 submission,
-built for the **Arjun** persona (Punggol → one-north, multi-modal, flexible start time,
-optimises for comfort/crowding over raw speed).
+A transit app for Singapore that answers the question commuters actually
+ask every morning: **"how do I get there, and will something ruin it on the
+way?"** Built for Problem Statement 2 (see
+[`Problem_Statement_2_Specification.pdf`](Problem_Statement_2_Specification.pdf)).
 
-It pulls live data from LTA DataMall and data.gov.sg, and produces a ranked, reasoned,
-door-to-door set of travel recommendations for Arjun's morning commute.
+Search a destination, get real bus/MRT/cycle options ranked by speed and
+comfort, and get proactively warned — with a one-tap reroute — if rain,
+an accident, or an MRT disruption hits your route while you're on it.
 
-## Prerequisites
+## What it does
 
-- Python 3.10+
-- A free LTA DataMall **API Account Key** — register at https://datamall.lta.gov.sg
-  (this is the *API Account Key* for the REST API, not the separate "Extended OBU
-  Library SDK Key" which LTA may also offer on the same site — that one is unrelated
-  and not used here)
-- No key needed for data.gov.sg endpoints (weather, rainfall, public holidays)
+**Plan a trip**
+- Search a destination with autocomplete (known MRT/LRT stations match
+  first, so short/ambiguous queries like "sembawang" resolve to the real
+  station, not a random same-named building)
+- Real turn-by-turn directions from OneMap — bus, MRT/LRT, and cycling
+  legs, not just straight-line distance
+- Two ranked options when there's a genuine trade-off: **Shortest**
+  (fastest overall) and **Comfort** (fewest changes), never a fabricated
+  duplicate when nothing beats the fastest option
+- Every leg shows its real MRT/LRT line color (NS/EW/NE/CC/DT/TE, straight
+  from LTA's official colour spec), a "Change at [stop]" callout for every
+  transfer, and total trip time
 
-## Setup
+**Near You**
+- Nearby bus stops and MRT/LRT stations from your live location, live
+  arrival times from LTA DataMall
+- Tap a bus number for a full-screen route page: every stop plotted on
+  the map, direction toggle for looping services, pull-up stop list
 
-1. Clone/download this folder.
-2. Create a virtual environment and install dependencies:
-   ```
-   python -m venv venv
-   venv\Scripts\activate      # Windows
-   source venv/bin/activate   # Mac/Linux
-   pip install -r requirements.txt
-   ```
-3. Create a `.env` file in the project root with:
-   ```
-   LTA_ACCOUNT_KEY=your_actual_key_here
-   ```
+**While navigating**
+- Live weather-aware rain warnings, with a swap-route prompt if you're
+  cycling and it starts raining
+- Live LTA `TrafficIncidents` checked against your bus leg's path —
+  accident nearby? Get a one-tap swap to an unaffected route
+- Live LTA `TrainServiceAlerts` checked against your MRT/LRT leg's line —
+  same reactive swap if your line goes down mid-trip
 
-## Running it
+**AI playground** (`api/`)
+- A working chat agent (Anthropic) and a persona-specific agentic loop
+  for "Arjun" (Groq) that reasons over live transit conditions
 
-```
-python main.py
-```
+## Live data, not mocks
 
-This runs two scenarios:
+Every one of these is a real, currently-working integration (mock data
+only kicks in automatically as a fallback if a key is missing or a live
+call fails):
 
-1. **Live data** — pulls real, current data and prints Arjun's ranked, door-to-door
-   recommendations (walk+cycle+LRT, walk+LRT, walk+bus).
-2. **Simulated disruption** — a saved, labelled test fixture with fake disrupted/crowded
-   conditions, included because live disruptions are rare during testing/judging. This
-   proves the recommendation logic actually reacts and re-ranks when conditions worsen.
+| Source | Used for |
+|---|---|
+| LTA DataMall `BusArrival`, `BusStops`, `BusRoutes` | live arrivals, nearby stops, full route/stop sequences |
+| LTA DataMall `TrainServiceAlerts` | MRT/LRT disruption detection during nav |
+| LTA DataMall `TrafficIncidents` | accident/roadwork detection during nav |
+| LTA DataMall `PCDRealTime` / `PCDForecast` | crowd level now and forecasted |
+| OneMap routing + search | turn-by-turn directions, destination autocomplete, geocoding |
+| data.gov.sg 2hr forecast + real-time rainfall | rain-aware routing and the reactive rain-swap prompt |
+
+## Tech stack
+
+- **Backend**: Node.js + Express (`backend/`), ES modules
+- **Frontend**: Vanilla JS + Leaflet.js — no build step, served as static
+  files directly by the backend
+- **AI**: Anthropic Claude (general chat) + Groq (Arjun's persona agent),
+  in a small sibling package (`api/`)
+- **Maps**: OpenStreetMap tiles, dark-mode via CSS filter
 
 ## Project structure
 
-| File | Purpose |
-|---|---|
-| `lta_client.py` | Raw API calls: LTA DataMall (train alerts, real-time crowd, crowd forecast, bus arrival) and data.gov.sg (2hr weather, rainfall, public holidays). Includes `safe_call()` for graceful failure handling. |
-| `parsing.py` | Normalizes raw API responses into clean internal data structures; also holds the fixed 2026 school vacation date ranges. |
-| `recommend.py` | Core decision logic — scores and ranks door-to-door travel options for Arjun. |
-| `main.py` | Entry point — runs the live pipeline and the disruption test fixture. |
-| `requirements.txt` | Pinned Python dependencies (`requests`, `python-dotenv`) — install with `pip install -r requirements.txt`. |
-
-## Integration point for the team
-
-The function your part of the app should call is:
-
-```python
-from recommend import recommend_for_arjun, rank_options
-
-recommendations = recommend_for_arjun(
-    train_alerts,       # from parse_train_alerts()
-    punggol_crowd,       # from get_station_crowd("NEL", "NE17")
-    serangoon_crowd,      # from get_station_crowd("NEL", "NE12")
-    cycling_ok,            # from is_weather_ok_for_cycling(weather, rainfall_raw=rainfall)
-    bus_services,           # from parse_bus_arrival()
-    forecast_level=None,     # optional, from get_forecast_for_time()
-    delay_suggestion=None,    # optional, from find_better_departure_window()
-    is_atypical_day=False,     # optional — True on a public holiday or school vacation day
-    atypical_reason="",         # optional — "public holiday" or "school vacation period"
-    walk_estimates=None          # optional — overrides the default placeholder walk minutes
-)
-ranked = rank_options(recommendations)
+```
+backend/server.js       Express app — every /api/* route
+backend/src/            LTA/OneMap/weather clients, route planning, decision logic
+api/                     AI playground + Arjun's agentic chat (own package.json)
+frontend/                index.html + app.js + styles.css — the actual UI, no build step
+lta_client.py, parsing.py,
+recommend.py, main.py    Separate Python decision-logic exploration —
+                         see ARJUN_DECISION_SERVICE.md (below)
 ```
 
-`ranked` is a list of `(option_dict, score)` tuples, sorted best-first, where each
-`option_dict` has `mode` (now door-to-door, e.g. `"walk 5min + LRT + walk 6min"`),
-`crowd_level`, and `reason` (human-readable explanation, including any relevant daily
-advisory from `TrainServiceAlerts.Message` and a note when walk times are estimates).
+## Getting started
 
-For a simplified three-way view instead of the full list:
-```python
-from recommend import categorize_top_choices
+Requires Node 20+.
 
-top_picks = categorize_top_choices(ranked)
-# top_picks["best_overall"]       -> (option_dict, score) tuple, or None if ranked is empty
-# top_picks["most_comfortable"]   -> (option_dict, score) tuple, lowest crowd_level
-# top_picks["fastest"]            -> always None currently — no real transit duration data
-#                                     exists in this layer yet (walk minutes are estimates,
-#                                     not ride time). See top_picks["fastest_note"].
+```bash
+cd backend && npm install        # also installs ../api per its postinstall script
+cp ../.env.example ../.env       # fill in the keys below
+npm run dev                      # http://localhost:8787
 ```
 
-`run_live()` in `main.py` returns `{"generated_at": <ISO timestamp>, "recommendations": ranked, "top_picks": top_picks}`
-— the timestamp is there so a caller (frontend) can judge data freshness, e.g. for the
-no-signal-underground case (see WRITEUP.md).
+`.env` (repo root, one level above `backend/`) — see
+[`.env.example`](.env.example) for the full annotated list:
 
-## Known assumptions
+| Key | Required for | If missing |
+|---|---|---|
+| `LTA_ACCOUNT_KEY` | live bus/train/incident data | falls back to realistic mock data |
+| `ONEMAP_TOKEN` | routing, search, autocomplete | those endpoints return 503 |
+| `ANTHROPIC_API_KEY` | `/api/chat` | that endpoint fails |
+| `GROQ_API_KEY` | Arjun's agentic chat | that endpoint fails |
 
-- Arjun's route is fixed as: Punggol (NE17) → North East Line → Serangoon (NE12) →
-  change to Circle Line → one-north.
-- Bus alternative uses bus stop `65259` (Punggol Stn/Int) as a fixed origin point.
-- Weather check is scoped to the "Punggol" area (2hr forecast) plus real-time rainfall
-  at station S81 "Punggol Central" (verified near-identical coordinates to Punggol MRT).
-- Walk-leg minutes (`WALK_ESTIMATES_MIN` in `recommend.py`) are placeholder estimates,
-  not computed from real routing data — see WRITEUP.md for the full boundary explanation.
-- School vacation dates are hardcoded for 2026 from MOE's official press release (no
-  clean API exists for this on data.gov.sg — checked).
+Both `LTA_ACCOUNT_KEY` and `ONEMAP_TOKEN` are free, self-service signups
+(links in `.env.example`) — no approval wait.
+
+### Deploying
+
+`Dockerfile` and `Procfile` both run `backend/server.js` directly — that's
+the one thing that needs to be deployed; it serves the frontend itself.
+
+## The team's other component
+
+[`ARJUN_DECISION_SERVICE.md`](ARJUN_DECISION_SERVICE.md) documents a
+separate Python module built alongside this app: real LTA/data.gov.sg data
+pulling, parsing, and a scored/ranked decision-logic layer for a specific
+commuter persona (Arjun: Punggol → one-north, optimises for comfort over
+speed). It's a standalone, thoroughly-documented exploration of the
+decision-logic problem — not wired into this app's live server, since the
+integrated app above implements its own version of that logic
+(`backend/src/decisionLogic.js`) for the deployed product. Worth reading
+for the reasoning behind what "comfort-optimised" and "honest uncertainty"
+actually mean for this problem, tested throughout against live API
+responses rather than assumed from docs.
+
+## Team
+
+Tang Nan · Jayasuryan Mutyala · Jie Hua · Khant · Moe

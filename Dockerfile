@@ -5,8 +5,6 @@ WORKDIR /app
 # Copy all repository files into the container
 COPY . .
 
-# Install dependencies for both the sibling api folder and backend
-RUN cd api && npm install --production
 RUN cd backend && npm install --production
 
 # Expose port 8080 (Cloud Run's default port)

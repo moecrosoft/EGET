@@ -38,9 +38,11 @@ an accident, or an MRT disruption hits your route while you're on it.
 - Live LTA `TrainServiceAlerts` checked against your MRT/LRT leg's line —
   same reactive swap if your line goes down mid-trip
 
-**AI playground** (`api/`)
-- A working chat agent (Anthropic) and a persona-specific agentic loop
-  for "Arjun" (Groq) that reasons over live transit conditions
+**Chat** — `POST /api/chat` (`backend/src/agent.js`), a working Claude-backed
+chat agent. A second, persona-specific agentic loop for "Arjun" exists at
+`backend/src/arjunAgent.js` but isn't currently wired to a route — it
+powered an AI playground UI that was removed, and the API layer that
+exposed it (`api/`) was removed with it since nothing called it anymore.
 
 ## Live data, not mocks
 
@@ -62,16 +64,15 @@ call fails):
 - **Backend**: Node.js + Express (`backend/`), ES modules
 - **Frontend**: Vanilla JS + Leaflet.js — no build step, served as static
   files directly by the backend
-- **AI**: Anthropic Claude (general chat) + Groq (Arjun's persona agent),
-  in a small sibling package (`api/`)
+- **AI**: Anthropic Claude (`/api/chat`); Groq (Arjun's persona agent,
+  built but not currently wired to a route)
 - **Maps**: OpenStreetMap tiles, dark-mode via CSS filter
 
 ## Project structure
 
 ```
 backend/server.js       Express app — every /api/* route
-backend/src/            LTA/OneMap/weather clients, route planning, decision logic
-api/                     AI playground + Arjun's agentic chat (own package.json)
+backend/src/            LTA/OneMap/weather clients, route planning, decision logic, AI agents
 frontend/                index.html + app.js + styles.css — the actual UI, no build step
 lta_client.py, parsing.py,
 recommend.py, main.py    Separate Python decision-logic exploration —
@@ -96,7 +97,7 @@ npm run dev                      # http://localhost:8787
 | `LTA_ACCOUNT_KEY` | live bus/train/incident data | falls back to realistic mock data |
 | `ONEMAP_TOKEN` | routing, search, autocomplete | those endpoints return 503 |
 | `ANTHROPIC_API_KEY` | `/api/chat` | that endpoint fails |
-| `GROQ_API_KEY` | Arjun's agentic chat | that endpoint fails |
+| `GROQ_API_KEY` | Arjun's agent (`backend/src/arjunAgent.js`) | n/a — not currently wired to a route |
 
 Both `LTA_ACCOUNT_KEY` and `ONEMAP_TOKEN` are free, self-service signups
 (links in `.env.example`) — no approval wait.

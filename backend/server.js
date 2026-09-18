@@ -41,28 +41,14 @@ import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from ".
 import { nextScenario } from "./src/mockData.js";
 import { getJourneyOptions } from "./src/journeyPlanner.js";
 import { planRoute } from "./src/routePlanner.js";
-import aiRouter from "../api/index.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-// api/ is its own small ESM package (own package.json/node_modules, since
-// it's a sibling of backend/ rather than nested inside it — Node's ESM
-// resolver won't walk up to backend/node_modules for a sibling directory).
-// Mounted under /api so its routes land at /api/ai/* (generate-text,
-// generate-image, embeddings, chat, and the real Arjun agent at
-// /api/ai/arjun/chat), matching what frontend/app.js's AI playground calls.
-app.use("/api", aiRouter);
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
-    "\n[WARN] ANTHROPIC_API_KEY is not set. The chat/agent endpoints will fail until you add it to .env.\n"
-  );
-}
-
-if (!process.env.GROQ_API_KEY) {
-  console.warn(
-    "\n[WARN] GROQ_API_KEY is not set. The /ai/arjun/chat endpoint will fail until you add it to .env.\n"
+    "\n[WARN] ANTHROPIC_API_KEY is not set. The /api/chat endpoint will fail until you add it to .env.\n"
   );
 }
 

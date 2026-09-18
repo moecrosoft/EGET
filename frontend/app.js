@@ -183,7 +183,7 @@ function renderBoardCustom(route) {
   const arrive = addMinutesToClock(time, totalMin);
 
   $("boardModeRow").innerHTML = `
-    ${pathSvg(ICON.walk, { size: 40, width: 1.5 })}
+    ${pathSvg(MODE_ICON[route.legs?.[0]?.mode] || ICON.walk, { size: 40, width: 1.5 })}
     <div class="mode-text">
       <span class="mode-name">${route.destination.name}</span>
       <span class="mode-why"><span>${route.transfers > 0 ? `${route.transfers} transfer${route.transfers > 1 ? "s" : ""}` : "Direct"}</span></span>

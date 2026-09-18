@@ -1,5 +1,6 @@
 import { geocodeAddress, getPtItineraries, getWalkCycleRoute } from "./onemapClient.js";
 import { todayDateString, toOneMapTime } from "./dateUtils.js";
+import { findStationByName } from "./ltaClient.js";
 
 function transitModeLabel(legs) {
   const hasRail = legs.some((l) => l.mode === "RAIL" || l.mode === "SUBWAY");
@@ -21,7 +22,14 @@ function transitModeLabel(legs) {
  * itinerary ("Comfort"), and cycling — with the fastest flagged recommended.
  */
 export async function planRoute({ from, to, toLatLng, time }) {
-  const destination = toLatLng || (await geocodeAddress(to));
+  // A plain station/town name (e.g. "Sembawang") geocodes as free text to
+  // whatever address OneMap's search ranks first — often a random building
+  // that happens to share the name, not the actual interchange (seen live:
+  // "Sembawang" resolved to a Sembawang Air Base address 3km from the real
+  // town/MRT). Snap to our own known station coordinates first when the
+  // text matches one exactly, before falling back to address search.
+  const station = toLatLng ? null : findStationByName(to);
+  const destination = toLatLng || (station && { lat: station.latitude, lng: station.longitude, address: `${station.name} MRT/LRT Station` }) || (await geocodeAddress(to));
   if (!destination) {
     return { error: `Couldn't find "${to}" — try a more specific address or station name.` };
   }

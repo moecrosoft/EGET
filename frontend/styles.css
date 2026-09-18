@@ -12,14 +12,8 @@
   --ink-4: #9aa0a6;
   --ink-5: #6f7378;
   --bus: #1f8a57;
-  --lrt: #748477;
-  --nel: #9e28b5;
   --weather: #2f6fed;
   --weather-ink: #b8cfff;
-  --crowd-low: #4fbe8b;
-  --crowd-mid: #e0a93a;
-  --crowd-high: #e2605a;
-  --surface-active: #24282e;
   --overlay-bg: rgba(16, 18, 21, 0.86);
   --overlay-border: #2b3037;
   font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -39,12 +33,22 @@
   --ink-4: #75787e;
   --ink-5: #8b8f95;
   --weather-ink: #1c4fbe;
-  --surface-active: #e3e0d8;
   --overlay-bg: rgba(255, 255, 255, 0.86);
   --overlay-border: #d6d3ca;
 }
 
-* { box-sizing: border-box; }
+/* Themed scrollbar everywhere in the app, not per-panel — any element that
+   scrolls (now or added later) gets this dark thumb instead of the default
+   OS scrollbar, which stands out white/light against this UI. */
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
 html, body { margin: 0; overflow-x: hidden; }
 body { background: var(--bg); color: var(--ink); }
@@ -214,9 +218,7 @@ body { background: var(--bg); color: var(--ink); }
   isolation: isolate;
 }
 .map-board { height: 250px; }
-.map-near { height: 210px; }
 .map-near-full { position: absolute; inset: 0; }
-.map-route { height: 168px; }
 .map-nav { flex: 1; min-height: 0; border-radius: 0; border: none; }
 
 .mode-row { display: flex; align-items: center; gap: 12px; }
@@ -305,16 +307,6 @@ body { background: var(--bg); color: var(--ink); }
 .stop-sheet .near-caption { padding: 0 16px; margin-top: -6px; }
 .stop-sheet .stop-list { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
 
-/* Themed scrollbar for every dark scrollable panel — replaces the default
-   OS scrollbar, which stands out white/light against this UI. */
-.stop-sheet .stop-list, #routeStopSheet .stop-seq, .suggest-list {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.stop-sheet .stop-list::-webkit-scrollbar, #routeStopSheet .stop-seq::-webkit-scrollbar, .suggest-list::-webkit-scrollbar { width: 6px; }
-.stop-sheet .stop-list::-webkit-scrollbar-track, #routeStopSheet .stop-seq::-webkit-scrollbar-track, .suggest-list::-webkit-scrollbar-track { background: transparent; }
-.stop-sheet .stop-list::-webkit-scrollbar-thumb, #routeStopSheet .stop-seq::-webkit-scrollbar-thumb, .suggest-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
-.stop-sheet .stop-list::-webkit-scrollbar-thumb:hover, #routeStopSheet .stop-seq::-webkit-scrollbar-thumb:hover, .suggest-list::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
 /* Stops-near-you list: plain list, no map — map only shows after picking a
    specific bus number (on the route screen). */
@@ -399,7 +391,6 @@ body { background: var(--bg); color: var(--ink); }
   text-align: left;
   width: 100%;
 }
-.stop-row-icon { flex: none; }
 .stop-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .stop-row-name { font: 700 14px/1.25 "Work Sans", sans-serif; color: var(--ink); }
 .stop-row-sub { font: 400 11.5px "Work Sans", sans-serif; color: var(--ink-4); }
@@ -475,40 +466,6 @@ body { background: var(--bg); color: var(--ink); }
 .bus-row-eta { font: 700 22px "Roboto Mono", monospace; color: var(--ink); flex: none; }
 
 .route-label { font: 700 12px "Work Sans", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-4); }
-
-/* ---- Route bottom sheet ---- */
-.sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 24;
-  opacity: 0;
-  transition: opacity 0.22s ease;
-}
-.sheet-backdrop[hidden] { display: none; }
-.sheet-backdrop.open { opacity: 1; }
-
-.route-sheet {
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%) translateY(100%);
-  width: 100%;
-  max-width: 480px;
-  max-height: 78vh;
-  overflow-y: auto;
-  background: var(--surface-alt);
-  border-radius: 18px 18px 0 0;
-  padding: 6px 18px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  z-index: 25;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
-  transition: transform 0.25s ease;
-}
-.route-sheet[hidden] { display: none; }
-.route-sheet.open { transform: translateX(-50%) translateY(0); }
 
 .sheet-handle-row {
   margin: 0 auto;

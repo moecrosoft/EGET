@@ -168,7 +168,7 @@ export async function searchPlaces(text, limit = 5) {
   let results = first?.results || [];
   const totalPages = first?.totalNumPages || 1;
 
-  const extraPages = [2, 3, 4, 5].filter((p) => p <= totalPages);
+  const extraPages = [2, 3, 4, 5, 6].filter((p) => p <= totalPages);
   if (extraPages.length) {
     const extras = await Promise.all(extraPages.map((p) => fetchSearchPage(text, p).catch(() => null)));
     for (const page of extras) results = results.concat(page?.results || []);

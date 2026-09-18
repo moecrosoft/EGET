@@ -175,8 +175,8 @@ app.get("/api/geocode-suggest", async (req, res) => {
       lng: s.longitude,
     }));
     const seen = new Set(stationMatches.map((m) => m.name.toLowerCase()));
-    const placeMatches = (await searchPlaces(q, 5)).filter((m) => !seen.has((m.name || "").toLowerCase()));
-    res.json({ suggestions: [...stationMatches, ...placeMatches].slice(0, 6) });
+    const placeMatches = (await searchPlaces(q, 8)).filter((m) => !seen.has((m.name || "").toLowerCase()));
+    res.json({ suggestions: [...stationMatches, ...placeMatches].slice(0, 10) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -133,7 +133,13 @@ body { background: var(--bg); color: var(--ink); }
   overflow-y: auto;
   max-height: 240px;
   z-index: 20;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.suggest-list::-webkit-scrollbar { width: 6px; }
+.suggest-list::-webkit-scrollbar-track { background: transparent; }
+.suggest-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.suggest-list::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 .suggest-item {
   display: block;
   width: 100%;

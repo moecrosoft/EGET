@@ -766,7 +766,7 @@ async function loadBusRoute(serviceNo, direction = null) {
           radius: isEnd ? 6 : 4,
           color: "#0e1114",
           weight: 1.5,
-          fillColor: isEnd ? "#f2f0ec" : "#1f8a57",
+          fillColor: "#f2f0ec",
           fillOpacity: 1,
         }).addTo(nearRouteLayer);
       });

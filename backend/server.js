@@ -19,11 +19,13 @@ import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from ".
 import { nextScenario } from "./src/mockData.js";
 import { getJourneyOptions } from "./src/journeyPlanner.js";
 import { planRoute } from "./src/routePlanner.js";
+import aiRouter from "../api/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(aiRouter);
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(

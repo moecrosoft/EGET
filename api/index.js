@@ -1,12 +1,13 @@
-const express = require('express');
+import express from "express";
+import aiRoutes from "./routes/ai.routes.js";
+import errorHandler from "./middleware/errorHandler.js";
+
 const router = express.Router();
-const aiRoutes = require('./routes/ai.routes');
-const errorHandler = require('./middleware/errorHandler');
 
 // Prefix AI endpoints under /ai
-router.use('/ai', aiRoutes);
+router.use("/ai", aiRoutes);
 
 // Register error handling middleware
 router.use(errorHandler);
 
-module.exports = router;
+export default router;

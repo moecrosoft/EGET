@@ -1,6 +1,14 @@
 const API = ""; // same-origin
 const $ = (id) => document.getElementById(id);
 
+// ============================= Theme (light/dark) =============================
+const THEME_KEY = "eget-theme";
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+}
+const savedTheme = localStorage.getItem(THEME_KEY);
+applyTheme(savedTheme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+
 // --- Icon paths, lifted verbatim from the EGET design file ---
 const ICON = {
   bike: "M5 17.5a3 3 0 106 0 3 3 0 10-6 0M13 17.5a3 3 0 106 0 3 3 0 10-6 0M8 17.5l4-8h4M10 9.5h4",
@@ -473,6 +481,12 @@ document.querySelectorAll(".ai-btn").forEach((btn) => {
     }
   };
 });
+
+$("themeToggle").onclick = () => {
+  const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+};
 
 // ============================= Clock + boot =============================
 function tickClock() {

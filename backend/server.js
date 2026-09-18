@@ -201,9 +201,12 @@ app.post("/api/nudges/:profileId/clear", (req, res) => {
 // --- Static frontend ---
 app.use(express.static(path.join(__dirname, "..", "frontend")));
 
-const PORT = process.env.PORT || 8787;
-app.listen(PORT, () => {
-  console.log(`Commute Companion backend running on http://localhost:${PORT}`);
+// TO THIS:
+const PORT = parseInt(process.env.PORT || "8080", 10);
+const HOST = "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(`Commute Companion backend running on http://${HOST}:${PORT}`);
   const intervalMs = Number(process.env.MONITOR_INTERVAL_MS) || 30000;
   startMonitor(intervalMs);
   console.log(`Proactive monitor sweeping every ${intervalMs / 1000}s`);

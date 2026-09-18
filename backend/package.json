@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "cd ../api && npm install --production",
     "start": "node server.js",
     "dev": "node --watch server.js"
   },

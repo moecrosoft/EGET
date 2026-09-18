@@ -216,7 +216,7 @@ function renderBoardPersona(data) {
     ${pathSvg(rec.id === "cycle-lrt" ? ICON.bike : ICON.bus, { size: 40, width: 1.5 })}
     <div class="mode-text">
       <span class="mode-name">${rec.mode}</span>
-      <span class="mode-why">${pathSvg(rainy ? ICON.rain : ICON.sun, { size: 14, stroke: "#9aa0a6", width: 2 })}<span>${data.weather?.nowcast || "Weather unavailable"}</span></span>
+      <span class="mode-why">${pathSvg(rainy ? ICON.rain : ICON.sun, { size: 14, stroke: "#9aa0a6", width: 2 })}<span>${data.weather?.nowcast || "Weather unavailable"} · ${Math.round(rec.etaMinutes)} min</span></span>
     </div>
     <span class="mode-eta">
       <span class="mode-eta-time">${arrive}</span>
@@ -266,7 +266,7 @@ function renderBoardCustom(route) {
     ${pathSvg(MODE_ICON[selected.legs?.[0]?.mode] || ICON.walk, { size: 40, width: 1.5 })}
     <div class="mode-text">
       <span class="mode-name">${route.destination.name}</span>
-      <span class="mode-why"><span>${selected.transfers > 0 ? `${selected.transfers} transfer${selected.transfers > 1 ? "s" : ""}` : "Direct"}</span></span>
+      <span class="mode-why"><span>${selected.transfers > 0 ? `${selected.transfers} transfer${selected.transfers > 1 ? "s" : ""}` : "Direct"} · ${totalMin} min</span></span>
     </div>
     <span class="mode-eta">
       <span class="mode-eta-time">${arrive}</span>
@@ -278,7 +278,7 @@ function renderBoardCustom(route) {
   $("boardLeaveLater").hidden = true;
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
   $("boardLeaveNowBtn").onclick = () =>
-    startNav({ legs: selected.legs, mode: route.destination.name }, time, arrive, options.find((o) => o.id !== selected.id));
+    startNav({ legs: selected.legs, mode: route.destination.name, totalTimeSeconds: selected.totalTimeSeconds }, time, arrive, options.find((o) => o.id !== selected.id));
 }
 
 function renderBoard() {
@@ -299,6 +299,12 @@ let navAlternative = null; // { mode, legs } — a non-cycling option to offer i
 let navRainCardShown = false;
 let navWeatherPoll = null;
 
+function optionTotalMinutes(option) {
+  if (option.totalTimeSeconds != null) return Math.round(option.totalTimeSeconds / 60);
+  if (option.etaMinutes != null) return Math.round(option.etaMinutes);
+  return Math.round((option.legs || []).reduce((sum, l) => sum + (l.durationSeconds || 0), 0) / 60);
+}
+
 function startNav(option, leaveTime, arriveTime, alternative) {
   const legs = option.legs || [];
   const current = legs[0];
@@ -307,7 +313,7 @@ function startNav(option, leaveTime, arriveTime, alternative) {
   $("navInstruction").textContent = current
     ? `${current.mode === "CYCLE" ? "Cycle" : current.mode === "WALK" ? "Walk" : current.mode === "BUS" ? "Take bus" + (current.route ? " " + current.route : "") : "Take " + (current.route || "the train")}${current.to ? " to " + current.to : ""}`
     : "Head to your first stop";
-  $("navInstructionSub").textContent = `Leave ${leaveTime}`;
+  $("navInstructionSub").textContent = `Leave ${leaveTime} · ${optionTotalMinutes(option)} min total`;
   $("navNextLabel").textContent = next
     ? `Change to ${legModeLabel(next)}${current?.to ? " at " + current.to : ""}`
     : "Last leg of the trip";

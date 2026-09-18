@@ -21,10 +21,11 @@ const ICON = {
 
 const MODE_ICON = { CYCLE: ICON.bike, WALK: ICON.walk, BUS: ICON.bus, RAIL: ICON.train, SUBWAY: ICON.train };
 const MODE_COLOR = { CYCLE: "#a8acb2", WALK: "#8b9088", BUS: "#1f8a57", RAIL: "#9e28b5", SUBWAY: "#9e28b5" };
-// Official Singapore rail-line colors (LTA network map).
+// Official Singapore rail-line colors, from LTA's own "MRT Line Colour" RGB
+// spec (NS #d42e12, EW #009645, NE #9900ab, CC #fa9e0d, DT #005ec4, TE #784008).
 const LINE_COLORS = {
-  NS: "#d42e12", EW: "#009645", CG: "#009645", NE: "#9900aa",
-  CC: "#fa9e0d", CE: "#fa9e0d", DT: "#005ec4", TE: "#9d5b25",
+  NS: "#d42e12", EW: "#009645", CG: "#009645", NE: "#9900ab",
+  CC: "#fa9e0d", CE: "#fa9e0d", DT: "#005ec4", TE: "#784008",
   BP: "#748477", SE: "#748477", SW: "#748477", PE: "#748477", PW: "#748477",
 };
 function legColor(leg) {
@@ -87,7 +88,8 @@ function routeBadgeIcon(leg) {
   const label = leg.route || (leg.mode === "BUS" ? "Bus" : leg.mode === "RAIL" || leg.mode === "SUBWAY" ? "MRT" : "");
   if (!label) return null;
   const color = legColor(leg);
-  return L.divIcon({ className: "", html: `<span class="route-line-badge" style="background:${color}">${label}</span>`, iconSize: [0, 0] });
+  const mins = leg.durationSeconds != null ? ` · ${Math.round(leg.durationSeconds / 60)}m` : "";
+  return L.divIcon({ className: "", html: `<span class="route-line-badge" style="background:${color}">${label}${mins}</span>`, iconSize: [0, 0] });
 }
 function transferDotIcon(color) {
   return L.divIcon({ className: "", html: `<div class="eget-transfer-dot" style="border-color:${color}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] });

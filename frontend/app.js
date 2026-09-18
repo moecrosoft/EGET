@@ -311,6 +311,44 @@ function findDestination(dest) {
   );
 }
 
+function directionsToStop(stop) {
+  if (!navigator.geolocation) {
+    alert("Geolocation isn't supported by this browser.");
+    return;
+  }
+  const btn = $("nearDirectionsBtn");
+  const label = btn.querySelector("span");
+  label.textContent = "Locating…";
+  navigator.geolocation.getCurrentPosition(
+    async ({ coords }) => {
+      label.textContent = "Finding…";
+      try {
+        const time = nowClock();
+        const res = await fetch(
+          `${API}/api/plan-route?lat=${coords.latitude}&lng=${coords.longitude}&to=${encodeURIComponent(stop.description)}&toLat=${stop.latitude}&toLng=${stop.longitude}&time=${time}`
+        );
+        const data = await res.json();
+        if (data.error) {
+          alert(data.error);
+        } else {
+          customRoute = data;
+          customRouteOptionId = null;
+          renderBoard();
+          showScreen("board");
+        }
+      } catch (err) {
+        alert("Couldn't find directions: " + err.message);
+      } finally {
+        label.textContent = "Directions";
+      }
+    },
+    (err) => {
+      alert("Couldn't get your location: " + err.message);
+      label.textContent = "Directions";
+    }
+  );
+}
+
 // ============================= Near you =============================
 let nearStops = [];
 let nearStations = [];
@@ -345,6 +383,8 @@ document.querySelectorAll(".near-mode-tab").forEach((btn) => {
     renderNearList();
   };
 });
+
+$("nearStopSheetHandle").onclick = () => $("nearStopSheet").classList.toggle("expanded");
 
 function renderNearList() {
   $("nearList").hidden = false;
@@ -419,6 +459,7 @@ function openStop(idx) {
 
   $("nearStopName").textContent = stop.description;
   $("nearStopMeta").textContent = `Stop ${stop.busStopCode} · ${stop.distanceKm.toFixed(2)} km`;
+  $("nearDirectionsBtn").onclick = () => directionsToStop(stop);
 
   $("nearBusRows").innerHTML = stop.services
     .map(

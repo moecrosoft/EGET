@@ -11,14 +11,16 @@ function transitModeLabel(legs) {
 }
 
 /**
- * Real turn-by-turn directions from a point to a free-text destination:
- * geocodes the destination, then asks OneMap for both the best bus+MRT
- * itinerary (mode TRANSIT) and a direct cycling route. Returns every
+ * Real turn-by-turn directions from a point to a destination: `to` is
+ * geocoded as free text, unless `toLatLng` is given (e.g. a bus stop or
+ * station whose coordinates we already know — its name usually won't
+ * geocode well as an address). Asks OneMap for both the best bus+MRT
+ * itinerary (mode TRANSIT) and a direct cycling route, and returns every
  * option that came back (not just the fastest) so the UI can offer a
  * real choice, with the fastest one flagged as recommended.
  */
-export async function planRoute({ from, to, time }) {
-  const destination = await geocodeAddress(to);
+export async function planRoute({ from, to, toLatLng, time }) {
+  const destination = toLatLng || (await geocodeAddress(to));
   if (!destination) {
     return { error: `Couldn't find "${to}" — try a more specific address or station name.` };
   }

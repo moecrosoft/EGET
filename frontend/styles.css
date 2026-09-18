@@ -49,7 +49,7 @@
 html, body { margin: 0; overflow-x: hidden; }
 body { background: var(--bg); color: var(--ink); }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
+.app { height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
 
 .weather-banner {
   flex: none;
@@ -181,6 +181,7 @@ body { background: var(--bg); color: var(--ink); }
 }
 .map-board { height: 250px; }
 .map-near { height: 210px; }
+.map-near-full { position: absolute; inset: 0; }
 .map-route { height: 168px; }
 .map-nav { flex: 1; min-height: 0; border-radius: 0; border: none; }
 
@@ -246,6 +247,30 @@ body { background: var(--bg); color: var(--ink); }
 .near-title { font: 800 24px "Work Sans", sans-serif; color: var(--ink); letter-spacing: -0.02em; }
 .near-caption { font: 400 10.5px "Work Sans", sans-serif; color: var(--ink-4); margin-top: -4px; }
 
+#screen-near.active { height: 100%; }
+.near-map-view { flex: 1; min-height: 0; }
+.near-map-wrap { flex: 1; min-height: 280px; position: relative; }
+
+.stop-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 78%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-alt);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.28);
+  transform: translateY(calc(100% - 92px));
+  transition: transform 0.25s ease;
+}
+.stop-sheet.expanded { transform: translateY(0); }
+.stop-sheet .sheet-handle-row { margin: 0 auto; }
+.stop-sheet .near-caption { padding: 0 16px; margin-top: -6px; }
+.stop-sheet .stop-list { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
+
 .near-mode-tabs { display: flex; gap: 8px; }
 .near-mode-tab {
   flex: 1;
@@ -301,6 +326,23 @@ body { background: var(--bg); color: var(--ink); }
 
 .stop-detail-name { font: 800 21px/1.15 "Work Sans", sans-serif; color: var(--ink); letter-spacing: -0.015em; }
 .stop-detail-meta { font: 400 11.5px "Work Sans", sans-serif; color: var(--ink-4); margin-top: 5px; }
+
+.stop-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.directions-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  min-height: auto;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: var(--bus);
+  color: #fff;
+  font: 700 12px "Work Sans", sans-serif;
+  cursor: pointer;
+}
 
 .bus-rows { display: flex; flex-direction: column; gap: 8px; }
 .bus-row {

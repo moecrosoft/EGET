@@ -105,7 +105,7 @@
       </section>
 
       <section class="screen" data-screen="near" id="screen-near">
-        <div id="nearList" class="near-level">
+        <div id="nearList" class="near-level near-map-view">
           <button id="nearHomeBtn" class="back-row">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
           </button>
@@ -114,9 +114,18 @@
             <button class="near-mode-tab active" data-mode="bus">Bus</button>
             <button class="near-mode-tab" data-mode="mrt">MRT/LRT</button>
           </div>
-          <div id="nearMap" class="map-panel map-near"></div>
-          <div class="near-caption" id="nearCaption">Live arrivals from LTA, refreshed on open</div>
-          <div id="nearStopList" class="stop-list">Loading&hellip;</div>
+
+          <div class="near-map-wrap">
+            <div id="nearMap" class="map-panel map-near-full"></div>
+
+            <div id="nearStopSheet" class="stop-sheet">
+              <button id="nearStopSheetHandle" class="sheet-handle-row">
+                <span class="sheet-handle"></span>
+              </button>
+              <div class="near-caption" id="nearCaption">Live arrivals from LTA, refreshed on open</div>
+              <div id="nearStopList" class="stop-list">Loading&hellip;</div>
+            </div>
+          </div>
         </div>
 
         <div id="nearDetail" class="near-level" hidden>
@@ -124,9 +133,15 @@
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
             <span>All stops</span>
           </button>
-          <div>
-            <div id="nearStopName" class="stop-detail-name"></div>
-            <div id="nearStopMeta" class="stop-detail-meta"></div>
+          <div class="stop-detail-header">
+            <div>
+              <div id="nearStopName" class="stop-detail-name"></div>
+              <div id="nearStopMeta" class="stop-detail-meta"></div>
+            </div>
+            <button id="nearDirectionsBtn" class="directions-btn">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8-8-2z"></path></svg>
+              <span>Directions</span>
+            </button>
           </div>
           <div id="nearBusRows" class="bus-rows"></div>
         </div>

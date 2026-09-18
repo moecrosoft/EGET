@@ -131,7 +131,10 @@ app.get("/api/plan-route", async (req, res) => {
       return res.status(503).json({ error: "ONEMAP_TOKEN is not set — see .env.example." });
     }
     const time = req.query.time || new Date().toTimeString().slice(0, 5);
-    res.json(await planRoute({ from: { lat, lng }, to, time }));
+    const toLat = Number(req.query.toLat);
+    const toLng = Number(req.query.toLng);
+    const toLatLng = Number.isNaN(toLat) || Number.isNaN(toLng) ? null : { lat: toLat, lng: toLng };
+    res.json(await planRoute({ from: { lat, lng }, to, toLatLng, time }));
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: "Couldn't plan a route right now." });

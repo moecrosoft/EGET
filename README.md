@@ -4,8 +4,8 @@ This is the data integration and disruption/decision-logic component of our PS2 
 built for the **Arjun** persona (Punggol → one-north, multi-modal, flexible start time,
 optimises for comfort/crowding over raw speed).
 
-It pulls live data from LTA DataMall and data.gov.sg, and produces a ranked, reasoned
-set of travel recommendations (cycle+LRT / LRT / bus) for Arjun's morning commute.
+It pulls live data from LTA DataMall and data.gov.sg, and produces a ranked, reasoned,
+door-to-door set of travel recommendations for Arjun's morning commute.
 
 ## Prerequisites
 
@@ -14,6 +14,7 @@ set of travel recommendations (cycle+LRT / LRT / bus) for Arjun's morning commut
   (this is the *API Account Key* for the REST API, not the separate "Extended OBU
   Library SDK Key" which LTA may also offer on the same site — that one is unrelated
   and not used here)
+- No key needed for data.gov.sg endpoints (weather, rainfall, public holidays)
 
 ## Setup
 
@@ -38,8 +39,8 @@ python main.py
 
 This runs two scenarios:
 
-1. **Live data** — pulls real, current LTA/weather data and prints Arjun's ranked
-   recommendations (cycle+LRT, LRT only, bus).
+1. **Live data** — pulls real, current data and prints Arjun's ranked, door-to-door
+   recommendations (walk+cycle+LRT, walk+LRT, walk+bus).
 2. **Simulated disruption** — a saved, labelled test fixture with fake disrupted/crowded
    conditions, included because live disruptions are rare during testing/judging. This
    proves the recommendation logic actually reacts and re-ranks when conditions worsen.
@@ -48,9 +49,9 @@ This runs two scenarios:
 
 | File | Purpose |
 |---|---|
-| `lta_client.py` | Raw API calls to LTA DataMall and data.gov.sg (train alerts, real-time crowd, crowd forecast, bus arrival, weather). Includes `safe_call()` for graceful failure handling. |
-| `parsing.py` | Normalizes raw API responses into clean internal data structures. |
-| `recommend.py` | Core decision logic — scores and ranks travel options for Arjun. |
+| `lta_client.py` | Raw API calls: LTA DataMall (train alerts, real-time crowd, crowd forecast, bus arrival) and data.gov.sg (2hr weather, rainfall, public holidays). Includes `safe_call()` for graceful failure handling. |
+| `parsing.py` | Normalizes raw API responses into clean internal data structures; also holds the fixed 2026 school vacation date ranges. |
+| `recommend.py` | Core decision logic — scores and ranks door-to-door travel options for Arjun. |
 | `main.py` | Entry point — runs the live pipeline and the disruption test fixture. |
 
 ## Integration point for the team
@@ -61,22 +62,37 @@ The function your part of the app should call is:
 from recommend import recommend_for_arjun, rank_options
 
 recommendations = recommend_for_arjun(
-    train_alerts,      # from parse_train_alerts()
-    punggol_crowd,      # from get_station_crowd("NEL", "NE17")
-    serangoon_crowd,     # from get_station_crowd("NEL", "NE12")
-    cycling_ok,           # from is_weather_ok_for_cycling()
-    bus_services,          # from parse_bus_arrival()
-    forecast_level=None     # optional, from get_forecast_for_time()
+    train_alerts,       # from parse_train_alerts()
+    punggol_crowd,       # from get_station_crowd("NEL", "NE17")
+    serangoon_crowd,      # from get_station_crowd("NEL", "NE12")
+    cycling_ok,            # from is_weather_ok_for_cycling(weather, rainfall_raw=rainfall)
+    bus_services,           # from parse_bus_arrival()
+    forecast_level=None,     # optional, from get_forecast_for_time()
+    delay_suggestion=None,    # optional, from find_better_departure_window()
+    is_atypical_day=False,     # optional — True on a public holiday or school vacation day
+    atypical_reason="",         # optional — "public holiday" or "school vacation period"
+    walk_estimates=None          # optional — overrides the default placeholder walk minutes
 )
 ranked = rank_options(recommendations)
 ```
 
 `ranked` is a list of `(option_dict, score)` tuples, sorted best-first, where each
-`option_dict` has `mode`, `crowd_level`, and `reason` (human-readable explanation).
+`option_dict` has `mode` (now door-to-door, e.g. `"walk 5min + LRT + walk 6min"`),
+`crowd_level`, and `reason` (human-readable explanation, including any relevant daily
+advisory from `TrainServiceAlerts.Message` and a note when walk times are estimates).
+
+`run_live()` in `main.py` returns `{"generated_at": <ISO timestamp>, "recommendations": ranked}`
+— the timestamp is there so a caller (frontend) can judge data freshness, e.g. for the
+no-signal-underground case (see WRITEUP.md).
 
 ## Known assumptions
 
 - Arjun's route is fixed as: Punggol (NE17) → North East Line → Serangoon (NE12) →
   change to Circle Line → one-north.
 - Bus alternative uses bus stop `65259` (Punggol Stn/Int) as a fixed origin point.
-- Weather check is scoped to the "Punggol" area from the 2-hour forecast.
+- Weather check is scoped to the "Punggol" area (2hr forecast) plus real-time rainfall
+  at station S81 "Punggol Central" (verified near-identical coordinates to Punggol MRT).
+- Walk-leg minutes (`WALK_ESTIMATES_MIN` in `recommend.py`) are placeholder estimates,
+  not computed from real routing data — see WRITEUP.md for the full boundary explanation.
+- School vacation dates are hardcoded for 2026 from MOE's official press release (no
+  clean API exists for this on data.gov.sg — checked).

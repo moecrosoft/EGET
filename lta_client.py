@@ -64,3 +64,6 @@ def safe_call(func, *args, fallback=None, **kwargs):
     except Exception as e:
         print(f"[warning] {func.__name__} failed: {e}")
         return fallback
+
+if __name__ == "__main__":
+    print(get_2hr_weather())

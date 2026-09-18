@@ -118,24 +118,72 @@ export async function geocodeAddress(text) {
   return results[0] || null;
 }
 
-/**
- * Same OneMap search as geocodeAddress, but returns several candidates
- * instead of blindly taking the top one — a short/ambiguous query like "sim"
- * matches over a hundred places (Sim Lim Square, Simei, Sims Drive...), and
- * the top match is often not what the person meant. Lets the UI show a
- * picker instead of silently routing to the wrong place.
- */
-export async function searchPlaces(text, limit = 5) {
+async function fetchSearchPage(text, pageNum) {
   const url = `${SEARCH_BASE}?${new URLSearchParams({
     searchVal: text,
     returnGeom: "Y",
     getAddrDetails: "Y",
-    pageNum: "1",
+    pageNum: String(pageNum),
   }).toString()}`;
-  const res = await fetch(url);
+  // Search technically doesn't require a token, but anonymous requests get a
+  // much lower rate limit — cheap to send the token we already have (used
+  // for routing) and avoid tripping it on multi-page lookups like this one.
+  const headers = process.env.ONEMAP_TOKEN ? { Authorization: process.env.ONEMAP_TOKEN } : {};
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`OneMap search failed: ${res.status}`);
-  const data = await res.json();
-  return (data?.results || []).slice(0, limit).map((r) => ({
+  return res.json();
+}
+
+// 0 = query is a whole word right at the start of the name ("SIM
+// HEADQUARTERS" for "sim") — the best kind of match. 1 = whole word
+// elsewhere in the name. 2 = query is merely a substring of a longer word
+// ("SIMEI", "SIMS ..." for "sim") — OneMap ranks these no differently from
+// real word matches, which is why "sim" alone buries SIM HQ behind a dozen
+// SIMEI/SIMS/SIME entries.
+function matchScore(name, query) {
+  const n = name.toLowerCase();
+  const q = query.trim().toLowerCase();
+  const idx = n.indexOf(q);
+  if (idx === -1) return 3;
+  const isLetter = (c) => !!c && /[a-z]/.test(c);
+  const wholeWord = !isLetter(n[idx - 1]) && !isLetter(n[idx + q.length]);
+  if (!wholeWord) return 2;
+  return idx === 0 ? 0 : 1;
+}
+
+/**
+ * Same OneMap search as geocodeAddress, but returns several candidates
+ * instead of blindly taking the top one — a short/ambiguous query like "sim"
+ * matches over a hundred places, and OneMap's own ranking isn't relevance
+ * based: for "sim" it returns pages of SIM LIM SQUARE / SIMEI / SIMS ...
+ * with "SIM HEADQUARTERS" buried on page 4. A single page 1 fetch isn't
+ * enough to know that — even page 1 alone already looks "good" (SIM LIM
+ * SQUARE is a genuine whole-word match too) — so the first few pages are
+ * always pulled (in parallel, so it's still ~one round trip) and re-ranked
+ * together so every real word match has a chance to surface, not just
+ * whichever one happened to be on page 1.
+ */
+export async function searchPlaces(text, limit = 5) {
+  const first = await fetchSearchPage(text, 1);
+  let results = first?.results || [];
+  const totalPages = first?.totalNumPages || 1;
+
+  const extraPages = [2, 3, 4, 5].filter((p) => p <= totalPages);
+  if (extraPages.length) {
+    const extras = await Promise.all(extraPages.map((p) => fetchSearchPage(text, p).catch(() => null)));
+    for (const page of extras) results = results.concat(page?.results || []);
+  }
+
+  const seen = new Set();
+  const deduped = results.filter((r) => {
+    const key = `${r.SEARCHVAL}|${r.ADDRESS}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  deduped.sort((a, b) => matchScore(a.SEARCHVAL, text) - matchScore(b.SEARCHVAL, text));
+
+  return deduped.slice(0, limit).map((r) => ({
     name: r.SEARCHVAL,
     address: r.ADDRESS,
     lat: Number(r.LATITUDE),

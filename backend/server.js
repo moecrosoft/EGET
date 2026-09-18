@@ -1,10 +1,27 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
+import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
+// Resolve .env relative to this file's location (repo root, one level up
+// from backend/), not process.cwd() — so `cd backend && npm start` and
+// `node backend/server.js` from the repo root both find the same .env.
+// NOTE: placing this call before the imports below does NOT guarantee it
+// runs before their top-level code — ES module imports are hoisted and
+// fully evaluated before any of this file's own statements, regardless of
+// textual order. The invariant that actually matters: no statically-imported
+// module in this graph may read process.env at module-evaluation time.
+// agent.js / arjunAgent.js satisfy this by building their SDK clients
+// lazily (see getAnthropic()/getGroq() in those files), deferred until a
+// request actually comes in — by which point this dotenv.config() call
+// (which itself runs synchronously, early in this file's own execution)
+// has already populated process.env. If a future import ever needs an env
+// var at module-evaluation time, it must read it lazily too, not rely on
+// import order here.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+import express from "express";
+import cors from "cors";
 import {
   getTrainAlerts,
   getBusArrivals,
@@ -20,21 +37,28 @@ import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from ".
 import { nextScenario } from "./src/mockData.js";
 import { getJourneyOptions } from "./src/journeyPlanner.js";
 import { planRoute } from "./src/routePlanner.js";
+import aiRouter from "../api/index.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// api/ is CommonJS (require/module.exports), unlike the rest of this ESM
-// backend — createRequire bridges the two so its placeholder AI routes
-// (generate-text, generate-image, embeddings, chat) are reachable at /api/ai/*.
-const require = createRequire(import.meta.url);
-app.use("/api", require(path.join(__dirname, "..", "api", "index.js")));
+// api/ is its own small ESM package (own package.json/node_modules, since
+// it's a sibling of backend/ rather than nested inside it — Node's ESM
+// resolver won't walk up to backend/node_modules for a sibling directory).
+// Mounted under /api so its routes land at /api/ai/* (generate-text,
+// generate-image, embeddings, chat, and the real Arjun agent at
+// /api/ai/arjun/chat), matching what frontend/app.js's AI playground calls.
+app.use("/api", aiRouter);
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
     "\n[WARN] ANTHROPIC_API_KEY is not set. The chat/agent endpoints will fail until you add it to .env.\n"
+  );
+}
+
+if (!process.env.GROQ_API_KEY) {
+  console.warn(
+    "\n[WARN] GROQ_API_KEY is not set. The /ai/arjun/chat endpoint will fail until you add it to .env.\n"
   );
 }
 

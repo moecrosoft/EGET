@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     onemap_token: str = Field("",description="onemap token")
     lta_api_key: str = Field("",description="lta api key")
 
-    qdrant_api: str = Field("",description="qdrant api")
-    qdrant_collection: str = Field("eteg",description="qdrant collection name")
-
 
 @lru_cache(maxsize=1)
 def get_settings():

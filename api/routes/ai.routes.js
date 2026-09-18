@@ -1,17 +1,21 @@
-const express = require('express');
+import express from "express";
+import {
+  arjunChat,
+  generateText,
+  generateImage,
+  createEmbeddings,
+  streamChat,
+} from "../controllers/ai.controller.js";
+
 const router = express.Router();
-const aiController = require('../controllers/ai.controller');
 
-// Text generation & completion
-router.post('/generate-text', aiController.generateText);
+// Arjun agentic chat — see backend/src/arjunAgent.js
+router.post("/arjun/chat", arjunChat);
 
-// Image generation
-router.post('/generate-image', aiController.generateImage);
+// Original frontend AI-playground placeholders (no real model behind them)
+router.post("/generate-text", generateText);
+router.post("/generate-image", generateImage);
+router.post("/embeddings", createEmbeddings);
+router.post("/chat", streamChat);
 
-// Embeddings / Vector processing
-router.post('/embeddings', aiController.createEmbeddings);
-
-// Chat / Stream completion
-router.post('/chat', aiController.streamChat);
-
-module.exports = router;
+export default router;

@@ -223,7 +223,8 @@ __marimo__/
 .claude/settings.local.json
 
 # git worktrees (local, not shared)
-# .worktrees/
+.worktrees/
 
 # Node (backend/, frontend/, api/ all install their own)
 node_modules/
+npm-debug.log*

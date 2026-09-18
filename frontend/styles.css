@@ -390,10 +390,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
 
 /* ---- Near you curved CTA ---- */
 .near-cta-wrap {
-  flex: none;
-  position: relative;
-  height: 100px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 190px;
   overflow: hidden;
+  z-index: 15;
 }
 .near-cta-wrap[hidden] { display: none; }
 .near-cta {
@@ -401,12 +404,14 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 140vw;
-  max-width: 720px;
+  width: 160vw;
+  max-width: 760px;
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   border: none;
-  background: var(--bus);
+  background: linear-gradient(180deg, rgba(38, 158, 100, 0.82) 0%, rgba(17, 100, 62, 0.94) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;

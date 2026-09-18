@@ -419,7 +419,7 @@ body { background: var(--bg); color: var(--ink); }
   margin: 0;
   min-height: auto;
   cursor: pointer;
-  box-shadow: 0 -30px 50px 10px rgba(38, 158, 100, 0.3), 0 -4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 }
 .near-cta-title { font: 800 18px "Work Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
 .near-cta-sub { font: 500 14px "Work Sans", sans-serif; color: rgba(255, 255, 255, 0.85); }

@@ -32,6 +32,7 @@ import {
   findStationByName,
   getBusRouteStops,
 } from "./src/ltaClient.js";
+import { getWeather } from "./src/weatherClient.js";
 import { chatWithAgent } from "./src/agent.js";
 import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from "./src/monitor.js";
 import { nextScenario } from "./src/mockData.js";
@@ -63,6 +64,14 @@ if (!process.env.GROQ_API_KEY) {
 }
 
 // --- Live data (read-only passthroughs, normalized either live or mock) ---
+app.get("/api/weather", async (_req, res) => {
+  try {
+    res.json(await getWeather());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/alerts", async (_req, res) => {
   try {
     res.json(await getTrainAlerts());

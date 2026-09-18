@@ -115,9 +115,13 @@ async function fetchJourney(time) {
 
 function updateWeatherBanner(weather) {
   const banner = $("weatherBanner");
-  if (weather && typeof weather.rainExpectedWithinMinutes === "number") {
+  if (weather?.isRainingNow) {
     banner.hidden = false;
-    $("weatherBannerText").textContent = `Rain in ${weather.rainExpectedWithinMinutes} min · plan changed`;
+    $("weatherBannerText").textContent = "Raining now · plan may change";
+  } else if (weather && typeof weather.rainExpectedWithinMinutes === "number" && weather.forecastValidTo) {
+    banner.hidden = false;
+    const until = new Date(weather.forecastValidTo).toTimeString().slice(0, 5);
+    $("weatherBannerText").textContent = `Rain possible before ${until} · plan may change`;
   } else {
     banner.hidden = true;
   }
@@ -173,7 +177,7 @@ function renderBoardPersona(data) {
   if (later) $("boardLeaveLaterLabel").textContent = later.label + (later.reason ? ` — ${later.reason}` : "");
 
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
-  $("boardLeaveNowBtn").onclick = () => startNav(rec, time, arrive);
+  $("boardLeaveNowBtn").onclick = () => startNav(rec, time, arrive, data.options.find((o) => o.id !== rec.id));
 }
 
 function renderBoardCustom(route) {
@@ -218,7 +222,8 @@ function renderBoardCustom(route) {
   plotLegs(boardMap, boardLayer, selected.legs);
   $("boardLeaveLater").hidden = true;
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
-  $("boardLeaveNowBtn").onclick = () => startNav({ legs: selected.legs, mode: route.destination.name }, time, arrive);
+  $("boardLeaveNowBtn").onclick = () =>
+    startNav({ legs: selected.legs, mode: route.destination.name }, time, arrive, options.find((o) => o.id !== selected.id));
 }
 
 function renderBoard() {
@@ -235,7 +240,11 @@ async function refreshJourney() {
 $("tripBar").onclick = () => showScreen("plan");
 
 // ============================= Navigation =============================
-function startNav(option, leaveTime, arriveTime) {
+let navAlternative = null; // { mode, legs } — a non-cycling option to offer if it starts raining
+let navRainCardShown = false;
+let navWeatherPoll = null;
+
+function startNav(option, leaveTime, arriveTime, alternative) {
   const legs = option.legs || [];
   const current = legs[0];
   const next = legs[1];
@@ -249,12 +258,66 @@ function startNav(option, leaveTime, arriveTime) {
     : "Last leg of the trip";
   $("navArrive").textContent = arriveTime;
 
+  // Only worth offering a rain swap if this route is weather-exposed (cycling)
+  // and there's a non-cycling alternative to fall back to.
+  const exposedToRain = legs.some((l) => l.mode === "CYCLE");
+  navAlternative = exposedToRain && alternative && !(alternative.legs || []).some((l) => l.mode === "CYCLE") ? alternative : null;
+  navRainCardShown = false;
+  $("navRainCard").hidden = true;
+
   plotLegs(navMap, navLayer, legs);
   showScreen("nav");
+  startNavWeatherPoll();
 }
 
-$("navPlanBtn").onclick = () => showScreen("board");
-$("navEndBtn").onclick = () => showScreen("board");
+function stopNavWeatherPoll() {
+  clearInterval(navWeatherPoll);
+  navWeatherPoll = null;
+}
+
+function startNavWeatherPoll() {
+  stopNavWeatherPoll();
+  if (!navAlternative) return;
+  const check = async () => {
+    if (navRainCardShown || !navAlternative) return;
+    try {
+      const res = await fetch(`${API}/api/weather`);
+      const weather = await res.json();
+      if (weather.isRainingNow) showNavRainCard(weather);
+    } catch {
+      // silently skip this poll — try again next interval
+    }
+  };
+  check();
+  navWeatherPoll = setInterval(check, 60000);
+}
+
+function showNavRainCard(weather) {
+  navRainCardShown = true;
+  $("navRainCardTitle").textContent = "It's raining";
+  $("navRainCardBody").textContent =
+    `${weather.nowcast} at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`;
+  $("navSwapBtn").textContent = `Swap to ${navAlternative.mode}`;
+  $("navRainCard").hidden = false;
+}
+
+$("navSwapBtn").onclick = () => {
+  const alt = navAlternative;
+  $("navRainCard").hidden = true;
+  startNav(alt, nowClock(), $("navArrive").textContent);
+};
+$("navKeepGoingBtn").onclick = () => {
+  $("navRainCard").hidden = true;
+};
+
+$("navPlanBtn").onclick = () => {
+  stopNavWeatherPoll();
+  showScreen("board");
+};
+$("navEndBtn").onclick = () => {
+  stopNavWeatherPoll();
+  showScreen("board");
+};
 
 // ============================= Where to? =============================
 $("planFindBtn").onclick = () => findDestination($("planToInput").value.trim());

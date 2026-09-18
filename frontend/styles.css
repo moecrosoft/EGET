@@ -153,7 +153,6 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   min-height: 44px;
   cursor: pointer;
 }
-.plan-cta { margin-top: auto; }
 
 /* ---- Today (board) ---- */
 .trip-bar {

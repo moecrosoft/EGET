@@ -16,6 +16,11 @@ cp .env.example .env   # fill in real keys before running against live services
 uv sync
 ```
 
+`LITELLM_MASTER_KEY` is **required**, not optional — the app fails to start
+without it, and it's what the LiteLLM proxy uses to reject unauthenticated
+requests to your provider keys. Generate one with `openssl rand -hex 32` (a
+placeholder value is fine for local dev, but the variable must be set).
+
 ## Run the API
 
 ```bash
@@ -44,7 +49,10 @@ Starts:
 - `litellm` — LiteLLM proxy on `localhost:4000`, configured via `litellm_config.yaml`
   with three named "tier" models (`tier-nano` / Groq, `tier-small` / OpenRouter,
   `tier-large` / Anthropic with an OpenAI fallback). Requires the provider API keys
-  in `.env` to actually serve requests.
+  in `.env` to actually serve requests. `LITELLM_MASTER_KEY` must be set in `.env`
+  before running `docker compose up` — the proxy uses it as its client auth key
+  (`general_settings.master_key` in `litellm_config.yaml`), and without it the
+  proxy would accept unauthenticated requests against your real provider keys.
 
 The compose file has not been runtime-validated against a live `docker compose` in
 this environment (no Docker available) — see the Task 1 report for details.

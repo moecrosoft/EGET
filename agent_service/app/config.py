@@ -16,7 +16,11 @@ class Settings(BaseSettings):
 
     # LiteLLM gateway (self-hosted via docker-compose)
     litellm_base_url: str = "http://localhost:4000"
-    litellm_master_key: str = ""
+    # No default: the LiteLLM proxy enforces client auth via this key
+    # (see litellm_config.yaml's general_settings.master_key). An empty
+    # default would let the app boot with an unauthenticated proxy, so
+    # pydantic-settings requires LITELLM_MASTER_KEY to be set instead.
+    litellm_master_key: str
     groq_api_key: str = ""
     openrouter_api_key: str = ""
     anthropic_api_key: str = ""

@@ -276,6 +276,19 @@ body { background: var(--bg); color: var(--ink); }
 .stop-sheet .near-caption { padding: 0 16px; margin-top: -6px; }
 .stop-sheet .stop-list { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
 
+/* Stops-near-you list: plain list, no map — map only shows after picking a
+   specific bus number (on the route screen). */
+#nearMap { display: none; }
+#nearStopSheet {
+  position: static;
+  max-height: none;
+  height: 100%;
+  transform: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+#nearStopSheet .sheet-handle-row { display: none; }
+
 /* ---- Bus route (full-screen map + pull-up sheet) ---- */
 #screen-route.active { height: 100%; padding: 0; }
 .route-back-overlay {

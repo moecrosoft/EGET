@@ -1,8 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { toolDefinitions, executeTool } from "./tools.js";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+
+// Constructed lazily (not at module load) so that `new Anthropic(...)` only
+// runs once ANTHROPIC_API_KEY has actually been loaded into process.env —
+// see backend/server.js for why module-load-time construction is unsafe.
+let _anthropic;
+function getAnthropic() {
+  return (_anthropic ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
+}
 
 const SYSTEM_PROMPT = `You are Commute Companion, a proactive AI agent for Singapore public transit
 commuters. You have live tools for train alerts, bus arrivals, alternate
@@ -30,7 +37,7 @@ async function runAgentLoop(messages, systemPrompt = SYSTEM_PROMPT) {
   const toolCallsMade = [];
 
   for (let turn = 0; turn < 6; turn++) {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropic().messages.create({
       model: MODEL,
       max_tokens: 1024,
       system: systemPrompt,

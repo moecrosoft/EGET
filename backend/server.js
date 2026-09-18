@@ -1,9 +1,27 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
+import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Resolve .env relative to this file's location (repo root, one level up
+// from backend/), not process.cwd() — so `cd backend && npm start` and
+// `node backend/server.js` from the repo root both find the same .env.
+// NOTE: placing this call before the imports below does NOT guarantee it
+// runs before their top-level code — ES module imports are hoisted and
+// fully evaluated before any of this file's own statements, regardless of
+// textual order. The invariant that actually matters: no statically-imported
+// module in this graph may read process.env at module-evaluation time.
+// agent.js / arjunAgent.js satisfy this by building their SDK clients
+// lazily (see getAnthropic()/getGroq() in those files), deferred until a
+// request actually comes in — by which point this dotenv.config() call
+// (which itself runs synchronously, early in this file's own execution)
+// has already populated process.env. If a future import ever needs an env
+// var at module-evaluation time, it must read it lazily too, not rely on
+// import order here.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+import express from "express";
+import cors from "cors";
 import {
   getTrainAlerts,
   getBusArrivals,
@@ -19,15 +37,22 @@ import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from ".
 import { nextScenario } from "./src/mockData.js";
 import { getJourneyOptions } from "./src/journeyPlanner.js";
 import { planRoute } from "./src/routePlanner.js";
+import aiRouter from "../api/index.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(aiRouter);
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
     "\n[WARN] ANTHROPIC_API_KEY is not set. The chat/agent endpoints will fail until you add it to .env.\n"
+  );
+}
+
+if (!process.env.GROQ_API_KEY) {
+  console.warn(
+    "\n[WARN] GROQ_API_KEY is not set. The /ai/arjun/chat endpoint will fail until you add it to .env.\n"
   );
 }
 

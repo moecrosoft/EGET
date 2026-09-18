@@ -230,20 +230,22 @@ async function fetchAllBusRoutes() {
 }
 
 /**
- * All stops for one bus service, in sequence, for its lowest-numbered
- * direction (most services only have one; a handful loop and have two —
- * not disambiguated here, out of scope for a "show me the route" view).
+ * All stops for one bus service, in sequence. Most services only run one
+ * direction; a handful loop and have two (LTA's Direction field, 1 or 2).
+ * Defaults to the lowest-numbered direction; pass `direction` to request
+ * the other one. availableDirections lets the caller know whether a
+ * direction toggle is even worth showing.
  */
-export async function getBusRouteStops(serviceNo) {
-  if (!hasRealKey()) return { source: "mock", serviceNo, stops: [] };
+export async function getBusRouteStops(serviceNo, direction = null) {
+  if (!hasRealKey()) return { source: "mock", serviceNo, direction: null, availableDirections: [], stops: [] };
   try {
     const [routes, stops] = await Promise.all([fetchAllBusRoutes(), fetchAllBusStops()]);
     const stopMap = new Map(stops.map((s) => [s.busStopCode, s]));
-    const direction = Math.min(
-      ...routes.filter((r) => r.ServiceNo === serviceNo).map((r) => r.Direction)
-    );
-    const sequence = routes
-      .filter((r) => r.ServiceNo === serviceNo && r.Direction === direction)
+    const serviceRoutes = routes.filter((r) => r.ServiceNo === serviceNo);
+    const availableDirections = [...new Set(serviceRoutes.map((r) => r.Direction))].sort((a, b) => a - b);
+    const resolvedDirection = availableDirections.includes(direction) ? direction : Math.min(...availableDirections);
+    const sequence = serviceRoutes
+      .filter((r) => r.Direction === resolvedDirection)
       .sort((a, b) => a.StopSequence - b.StopSequence)
       .map((r) => {
         const info = stopMap.get(r.BusStopCode);
@@ -255,10 +257,10 @@ export async function getBusRouteStops(serviceNo) {
           longitude: info?.longitude ?? null,
         };
       });
-    return { source: "live", serviceNo, stops: sequence };
+    return { source: "live", serviceNo, direction: resolvedDirection, availableDirections, stops: sequence };
   } catch (err) {
     console.error("[ltaClient] bus route stops failed:", err.message);
-    return { source: "mock-fallback", serviceNo, stops: [] };
+    return { source: "mock-fallback", serviceNo, direction: null, availableDirections: [], stops: [] };
   }
 }
 

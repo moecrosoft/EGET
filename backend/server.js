@@ -152,7 +152,8 @@ app.get("/api/plan-route", async (req, res) => {
 
 app.get("/api/bus-route/:serviceNo", async (req, res) => {
   try {
-    res.json(await getBusRouteStops(req.params.serviceNo));
+    const direction = req.query.direction != null ? Number(req.query.direction) : null;
+    res.json(await getBusRouteStops(req.params.serviceNo, direction));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

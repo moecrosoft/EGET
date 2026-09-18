@@ -182,17 +182,31 @@
           <button id="navEndBtn" class="end-trip-btn">End trip</button>
         </div>
       </section>
-    </main>
 
-    <div id="routeSheetBackdrop" class="sheet-backdrop" hidden></div>
-    <div id="routeSheet" class="route-sheet" hidden>
-      <button id="routeSheetClose" class="sheet-handle-row">
-        <span class="sheet-handle"></span>
-      </button>
-      <div id="nearRouteLabel" class="route-label"></div>
-      <div id="nearRouteMap" class="map-panel map-route"></div>
-      <div id="nearStopSeq" class="stop-seq"></div>
-    </div>
+      <section class="screen" data-screen="route" id="screen-route">
+        <button id="routeBackBtn" class="back-row route-back-overlay">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f2f0ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+
+        <div class="near-map-wrap">
+          <div id="nearRouteMap" class="map-panel map-near-full"></div>
+
+          <div id="routeStopSheet" class="stop-sheet expanded">
+            <button id="routeStopSheetHandle" class="sheet-handle-row">
+              <span class="sheet-handle"></span>
+            </button>
+            <div class="route-sheet-header">
+              <div id="nearRouteLabel" class="route-label"></div>
+              <button id="routeDirectionBtn" class="direction-toggle-btn" hidden>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"></path></svg>
+                <span>Direction</span>
+              </button>
+            </div>
+            <div id="nearStopSeq" class="stop-seq"></div>
+          </div>
+        </div>
+      </section>
+    </main>
 
     <div class="near-cta-wrap" id="nearCtaWrap">
       <button class="near-cta" id="nearCta" aria-label="Near you – bus stops">

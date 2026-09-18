@@ -178,6 +178,11 @@ body { background: var(--bg); color: var(--ink); }
   background: var(--map-bg);
   position: relative;
   overflow: hidden;
+  /* Leaflet sets mix-blend-mode: plus-lighter on tiles (its own workaround
+     for a Chromium tile-seam bug, crbug.com/600120) — without isolation,
+     that blending reaches past the map into whatever's stacked above it
+     (e.g. a pull-up sheet), rendering it visibly translucent. */
+  isolation: isolate;
 }
 .map-board { height: 250px; }
 .map-near { height: 210px; }
@@ -270,6 +275,45 @@ body { background: var(--bg); color: var(--ink); }
 .stop-sheet .sheet-handle-row { margin: 0 auto; }
 .stop-sheet .near-caption { padding: 0 16px; margin-top: -6px; }
 .stop-sheet .stop-list { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
+
+/* ---- Bus route (full-screen map + pull-up sheet) ---- */
+#screen-route.active { height: 100%; padding: 0; }
+.route-back-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  min-height: auto;
+  border: 1px solid var(--overlay-border);
+  border-radius: 999px;
+  background: var(--overlay-bg);
+  cursor: pointer;
+}
+.route-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px; }
+#routeStopSheet .route-label { padding: 0; margin-top: 0; }
+#routeStopSheet .stop-seq { padding: 10px 16px 16px; overflow-y: auto; min-height: 0; }
+.direction-toggle-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  min-height: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: transparent;
+  color: var(--ink-3);
+  font: 700 11px "Work Sans", sans-serif;
+  cursor: pointer;
+}
+.direction-toggle-btn:hover { border-color: var(--ink-4); color: var(--ink); }
 
 .near-mode-tabs { display: flex; gap: 8px; }
 .near-mode-tab {

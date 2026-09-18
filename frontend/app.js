@@ -44,7 +44,11 @@ function nowClock() {
 let boardMap, boardLayer, nearMap, nearLayer, nearRouteMap, nearRouteLayer, navMap, navLayer;
 
 function createDarkMap(divId) {
-  const m = L.map(divId, { zoomControl: false, attributionControl: false });
+  // fadeAnimation off: Leaflet's per-tile "will-change: opacity" (from its
+  // leaflet-fade-anim class) was breaking the compositing order of anything
+  // absolutely-positioned above the map — a pull-up sheet rendered visibly
+  // translucent over the tiles instead of opaque.
+  const m = L.map(divId, { zoomControl: false, attributionControl: false, fadeAnimation: false });
   // Plain OSM tiles, darkened with a CSS filter on the tile pane (see styles.css) —
   // avoids the API key that dark-styled tile providers now require.
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(m);
@@ -85,7 +89,8 @@ function plotLegs(map, layer, legs, { fit = true } = {}) {
 let screen = "plan";
 const MAPS_BY_SCREEN = {
   board: () => [boardMap],
-  near: () => [nearMap, nearRouteMap],
+  near: () => [nearMap],
+  route: () => [nearRouteMap],
   nav: () => [navMap],
 };
 
@@ -540,42 +545,32 @@ function openStop(idx) {
   document.querySelectorAll("#nearBusRows .bus-row").forEach((row) => {
     row.onclick = () => {
       document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.toggle("active", r === row));
-      openRouteSheet();
+      showScreen("route");
       loadBusRoute(row.dataset.service);
     };
   });
 }
 
-function openRouteSheet() {
-  $("routeSheetBackdrop").hidden = false;
-  $("routeSheet").hidden = false;
-  requestAnimationFrame(() => {
-    $("routeSheetBackdrop").classList.add("open");
-    $("routeSheet").classList.add("open");
-  });
-  setTimeout(() => nearRouteMap.invalidateSize(), 260);
-}
+let routeDirection = null;
+let routeAvailableDirections = [];
 
-function closeRouteSheet() {
-  $("routeSheetBackdrop").classList.remove("open");
-  $("routeSheet").classList.remove("open");
-  setTimeout(() => {
-    $("routeSheetBackdrop").hidden = true;
-    $("routeSheet").hidden = true;
-  }, 250);
-  document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.remove("active"));
-}
-
-$("routeSheetClose").onclick = closeRouteSheet;
-$("routeSheetBackdrop").onclick = closeRouteSheet;
-
-async function loadBusRoute(serviceNo) {
+async function loadBusRoute(serviceNo, direction = null) {
   document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.toggle("active", r.dataset.service === serviceNo));
   $("nearRouteLabel").textContent = `Bus ${serviceNo}`;
+  $("routeDirectionBtn").hidden = true;
   $("nearStopSeq").innerHTML = `<div class="hint-text">Loading route…</div>`;
   try {
-    const res = await fetch(`${API}/api/bus-route/${encodeURIComponent(serviceNo)}`);
+    const url = `${API}/api/bus-route/${encodeURIComponent(serviceNo)}${direction != null ? `?direction=${direction}` : ""}`;
+    const res = await fetch(url);
     const data = await res.json();
+    routeDirection = data.direction;
+    routeAvailableDirections = data.availableDirections || [];
+    $("routeDirectionBtn").hidden = routeAvailableDirections.length < 2;
+    $("routeDirectionBtn").onclick = () => {
+      const other = routeAvailableDirections.find((d) => d !== routeDirection);
+      loadBusRoute(serviceNo, other);
+    };
+
     const stops = data.stops || [];
     if (!stops.length) {
       $("nearStopSeq").innerHTML = `<div class="hint-text">No route data available (needs a live LTA_ACCOUNT_KEY).</div>`;
@@ -606,16 +601,15 @@ async function loadBusRoute(serviceNo) {
   }
 }
 
+$("routeBackBtn").onclick = () => showScreen("near");
+$("routeStopSheetHandle").onclick = () => $("routeStopSheet").classList.toggle("expanded");
+
 $("nearBackBtn").onclick = () => {
   nearStopIdx = null;
-  closeRouteSheet();
   renderNearList();
 };
 
-$("nearHomeBtn").onclick = () => {
-  closeRouteSheet();
-  showScreen("plan");
-};
+$("nearHomeBtn").onclick = () => showScreen("plan");
 
 function findNearby() {
   if (!navigator.geolocation) {

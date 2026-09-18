@@ -30,8 +30,10 @@ import {
   getNearbyStations,
   getAllStations,
   findStationByName,
+  searchStations,
   getBusRouteStops,
 } from "./src/ltaClient.js";
+import { searchPlaces } from "./src/onemapClient.js";
 import { getWeather } from "./src/weatherClient.js";
 import { chatWithAgent } from "./src/agent.js";
 import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from "./src/monitor.js";
@@ -147,6 +149,27 @@ app.get("/api/plan-route", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: "Couldn't plan a route right now." });
+  }
+});
+
+// Destination search suggestions: known MRT/LRT stations that match first,
+// then OneMap place results — lets the Home search bar show a picker instead
+// of silently routing to whatever a short/ambiguous query happens to match.
+app.get("/api/geocode-suggest", async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (!q) return res.json({ suggestions: [] });
+    const stationMatches = searchStations(q, 5).map((s) => ({
+      name: s.name,
+      address: `${s.name} MRT/LRT Station`,
+      lat: s.latitude,
+      lng: s.longitude,
+    }));
+    const seen = new Set(stationMatches.map((m) => m.name.toLowerCase()));
+    const placeMatches = (await searchPlaces(q, 5)).filter((m) => !seen.has((m.name || "").toLowerCase()));
+    res.json({ suggestions: [...stationMatches, ...placeMatches].slice(0, 6) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

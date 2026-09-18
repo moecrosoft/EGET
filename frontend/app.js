@@ -381,9 +381,15 @@ $("navEndBtn").onclick = () => {
 };
 
 // ============================= Where to? =============================
+// Set only when the person picks a suggestion (real OneMap/station coords),
+// cleared as soon as they type again — typing invalidates the pick, so a
+// stale lat/lng never gets silently reused for edited text.
+let selectedDest = null;
+
 $("planFindBtn").onclick = () => findDestination($("planToInput").value.trim());
 $("planToInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") findDestination($("planToInput").value.trim());
+  if (e.key === "Enter") { hideSuggestions(); findDestination($("planToInput").value.trim()); }
+  if (e.key === "Escape") hideSuggestions();
 });
 document.querySelectorAll(".recent-row").forEach((row) => {
   row.onclick = () => {
@@ -392,6 +398,50 @@ document.querySelectorAll(".recent-row").forEach((row) => {
     findDestination(dest);
   };
 });
+
+let suggestDebounce = null;
+$("planToInput").addEventListener("input", () => {
+  selectedDest = null;
+  const q = $("planToInput").value.trim();
+  clearTimeout(suggestDebounce);
+  if (q.length < 2) { hideSuggestions(); return; }
+  suggestDebounce = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API}/api/geocode-suggest?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      renderSuggestions(data.suggestions || []);
+    } catch {
+      hideSuggestions();
+    }
+  }, 300);
+});
+// Clicks inside the list fire before this, so a plain blur-hide is safe.
+$("planToInput").addEventListener("blur", () => setTimeout(hideSuggestions, 150));
+
+function hideSuggestions() {
+  $("planSuggest").hidden = true;
+  $("planSuggest").innerHTML = "";
+}
+
+function renderSuggestions(suggestions) {
+  if (!suggestions.length) return hideSuggestions();
+  $("planSuggest").innerHTML = suggestions
+    .map(
+      (s, i) => `<button type="button" class="suggest-item" data-idx="${i}">
+        ${s.name}<span class="suggest-item-sub">${s.address}</span>
+      </button>`
+    )
+    .join("");
+  $("planSuggest").hidden = false;
+  suggestions.forEach((s, i) => {
+    $("planSuggest").querySelector(`[data-idx="${i}"]`).onclick = () => {
+      $("planToInput").value = s.name;
+      selectedDest = s;
+      hideSuggestions();
+      findDestination(s.name);
+    };
+  });
+}
 
 function findDestination(dest) {
   if (!dest) {
@@ -410,8 +460,9 @@ function findDestination(dest) {
       $("planFindBtn").textContent = "Finding the best route…";
       try {
         const time = nowClock();
+        const toParams = selectedDest ? `&toLat=${selectedDest.lat}&toLng=${selectedDest.lng}` : "";
         const res = await fetch(
-          `${API}/api/plan-route?lat=${coords.latitude}&lng=${coords.longitude}&to=${encodeURIComponent(dest)}&time=${time}`
+          `${API}/api/plan-route?lat=${coords.latitude}&lng=${coords.longitude}&to=${encodeURIComponent(dest)}&time=${time}${toParams}`
         );
         const data = await res.json();
         if (data.error) {
@@ -431,7 +482,8 @@ function findDestination(dest) {
     (err) => {
       alert("Couldn't get your location: " + err.message);
       $("planFindBtn").textContent = "Find my route";
-    }
+    },
+    { timeout: 8000, maximumAge: 30000 }
   );
 }
 

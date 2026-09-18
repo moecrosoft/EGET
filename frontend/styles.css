@@ -106,7 +106,7 @@ body { background: var(--bg); color: var(--ink); }
 
 .route-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .field { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-.field-to { border-color: var(--border-focus); }
+.field-to { border-color: var(--border-focus); position: relative; }
 .field-label { font: 500 10px "Work Sans", sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-5); }
 .field-value { font: 600 15px "Work Sans", sans-serif; color: var(--ink); margin-top: 4px; }
 .field-input {
@@ -120,6 +120,35 @@ body { background: var(--bg); color: var(--ink); }
 }
 .field-input::placeholder { color: var(--ink-5); font-weight: 500; }
 .field-input:focus { outline: none; }
+
+.suggest-list {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: calc(100% + 6px);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  overflow-y: auto;
+  max-height: 240px;
+  z-index: 20;
+}
+.suggest-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font: 600 13.5px "Work Sans", sans-serif;
+  color: var(--ink);
+}
+.suggest-item:last-child { border-bottom: none; }
+.suggest-item:hover, .suggest-item:active { background: var(--surface); }
+.suggest-item-sub { display: block; margin-top: 2px; font: 400 11px "Work Sans", sans-serif; color: var(--ink-4); }
 
 .recents { display: flex; flex-direction: column; }
 .recent-row {

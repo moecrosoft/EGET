@@ -114,6 +114,18 @@ const SEARCH_BASE = "https://www.onemap.gov.sg/api/common/elastic/search";
  * for Singapore addresses and building names, not vague queries.
  */
 export async function geocodeAddress(text) {
+  const results = await searchPlaces(text, 1);
+  return results[0] || null;
+}
+
+/**
+ * Same OneMap search as geocodeAddress, but returns several candidates
+ * instead of blindly taking the top one — a short/ambiguous query like "sim"
+ * matches over a hundred places (Sim Lim Square, Simei, Sims Drive...), and
+ * the top match is often not what the person meant. Lets the UI show a
+ * picker instead of silently routing to the wrong place.
+ */
+export async function searchPlaces(text, limit = 5) {
   const url = `${SEARCH_BASE}?${new URLSearchParams({
     searchVal: text,
     returnGeom: "Y",
@@ -123,7 +135,10 @@ export async function geocodeAddress(text) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`OneMap search failed: ${res.status}`);
   const data = await res.json();
-  const top = data?.results?.[0];
-  if (!top) return null;
-  return { lat: Number(top.LATITUDE), lng: Number(top.LONGITUDE), address: top.ADDRESS };
+  return (data?.results || []).slice(0, limit).map((r) => ({
+    name: r.SEARCHVAL,
+    address: r.ADDRESS,
+    lat: Number(r.LATITUDE),
+    lng: Number(r.LONGITUDE),
+  }));
 }

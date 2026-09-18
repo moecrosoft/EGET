@@ -170,6 +170,12 @@ export function findStationByName(name) {
   return MRT_STATIONS.find((s) => s.name.toLowerCase() === needle) || null;
 }
 
+export function searchStations(text, limit = 5) {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return [];
+  return MRT_STATIONS.filter((s) => s.name.toLowerCase().includes(needle)).slice(0, limit);
+}
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;

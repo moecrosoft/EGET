@@ -394,7 +394,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 190px;
+  height: 230px;
   overflow: hidden;
   z-index: 15;
 }
@@ -415,15 +415,15 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 18px 0 0;
+  gap: 4px;
+  padding: 26px 0 0;
   margin: 0;
   min-height: auto;
   cursor: pointer;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 }
-.near-cta-title { font: 800 13px "Work Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
-.near-cta-sub { font: 500 11px "Work Sans", sans-serif; color: rgba(255, 255, 255, 0.85); }
+.near-cta-title { font: 800 18px "Work Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
+.near-cta-sub { font: 500 14px "Work Sans", sans-serif; color: rgba(255, 255, 255, 0.85); }
 
 /* ---- AI playground (dev) ---- */
 .ai-playground { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }

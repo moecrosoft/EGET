@@ -92,15 +92,12 @@ const MAPS_BY_SCREEN = {
 function showScreen(name) {
   screen = name;
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
-  $("tabbar").hidden = name !== "plan";
-  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $("nearCtaWrap").hidden = name !== "plan";
   (MAPS_BY_SCREEN[name]?.() || []).forEach((m) => m && setTimeout(() => m.invalidateSize(), 0));
   if (name === "near" && nearStops.length === 0) findNearby();
 }
 
-document.querySelectorAll(".tab-btn").forEach((btn) => {
-  btn.onclick = () => showScreen(btn.dataset.tab);
-});
+$("nearCta").onclick = () => showScreen("near");
 
 // ============================= Today (board) =============================
 let journeyData = null;

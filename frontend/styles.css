@@ -388,32 +388,37 @@ body { margin: 0; background: var(--bg); color: var(--ink); }
   cursor: pointer;
 }
 
-/* ---- Tab bar ---- */
-.tabbar {
+/* ---- Near you curved CTA ---- */
+.near-cta-wrap {
   flex: none;
-  display: flex;
-  background: var(--surface-alt);
-  padding: 8px 8px 13px;
-  gap: 6px;
+  position: relative;
+  height: 100px;
+  overflow: hidden;
 }
-.tabbar[hidden] { display: none; }
-.tab-btn {
-  flex: 1;
+.near-cta-wrap[hidden] { display: none; }
+.near-cta {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140vw;
+  max-width: 720px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: none;
+  background: var(--bus);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  border: none;
-  background: transparent;
-  color: var(--ink-5);
-  border-radius: 12px;
-  padding: 10px 4px;
+  gap: 2px;
+  padding: 18px 0 0;
   margin: 0;
   min-height: auto;
-  font: 600 10.5px "Work Sans", sans-serif;
   cursor: pointer;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 }
-.tab-btn.active { background: var(--surface-active); color: var(--ink); }
+.near-cta-title { font: 800 13px "Work Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
+.near-cta-sub { font: 500 11px "Work Sans", sans-serif; color: rgba(255, 255, 255, 0.85); }
 
 /* ---- AI playground (dev) ---- */
 .ai-playground { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }

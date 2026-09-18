@@ -1,0 +1,35 @@
+# LiteLLM proxy config. See https://docs.litellm.ai/docs/proxy/configs
+#
+# Defines three named "tier" models the app talks to via the OpenAI-compatible
+# /chat/completions endpoint, plus a router-level fallback from the large tier
+# to OpenAI if Anthropic fails.
+model_list:
+  - model_name: tier-nano
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: tier-small
+    litellm_params:
+      model: openrouter/anthropic/claude-3.5-haiku
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: tier-large
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: tier-large-fallback
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+router_settings:
+  fallbacks:
+    - tier-large: ["tier-large-fallback"]
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

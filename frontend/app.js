@@ -102,6 +102,7 @@ $("nearCta").onclick = () => showScreen("near");
 // ============================= Today (board) =============================
 let journeyData = null;
 let customRoute = null; // set after a real destination search from the Where to? screen
+let customRouteOptionId = null; // which of customRoute.options is currently shown
 
 async function fetchJourney(time) {
   try {
@@ -178,26 +179,46 @@ function renderBoardPersona(data) {
 function renderBoardCustom(route) {
   updateWeatherBanner(null);
   $("tripBarLabel").textContent = `Your location → ${route.destination.name}`;
-  const totalMin = Math.round(route.totalTimeSeconds / 60);
+
+  const options = route.options || [];
+  const selectedId = customRouteOptionId || route.recommendedId || options[0]?.id;
+  const selected = options.find((o) => o.id === selectedId) || options[0];
+
+  $("boardOptionRow").hidden = options.length < 2;
+  $("boardOptionRow").innerHTML = options
+    .map(
+      (o) => `<button class="near-mode-tab${o.id === selected.id ? " active" : ""}" data-option="${o.id}">
+        ${o.mode} · ${Math.round(o.totalTimeSeconds / 60)}m
+      </button>`
+    )
+    .join("");
+  document.querySelectorAll("#boardOptionRow .near-mode-tab").forEach((btn) => {
+    btn.onclick = () => {
+      customRouteOptionId = btn.dataset.option;
+      renderBoardCustom(route);
+    };
+  });
+
+  const totalMin = Math.round(selected.totalTimeSeconds / 60);
   const time = nowClock();
   const arrive = addMinutesToClock(time, totalMin);
 
   $("boardModeRow").innerHTML = `
-    ${pathSvg(MODE_ICON[route.legs?.[0]?.mode] || ICON.walk, { size: 40, width: 1.5 })}
+    ${pathSvg(MODE_ICON[selected.legs?.[0]?.mode] || ICON.walk, { size: 40, width: 1.5 })}
     <div class="mode-text">
       <span class="mode-name">${route.destination.name}</span>
-      <span class="mode-why"><span>${route.transfers > 0 ? `${route.transfers} transfer${route.transfers > 1 ? "s" : ""}` : "Direct"}</span></span>
+      <span class="mode-why"><span>${selected.transfers > 0 ? `${selected.transfers} transfer${selected.transfers > 1 ? "s" : ""}` : "Direct"}</span></span>
     </div>
     <span class="mode-eta">
       <span class="mode-eta-time">${arrive}</span>
       <span class="mode-eta-label">Arrive</span>
     </span>`;
 
-  $("boardLegStrip").innerHTML = (route.legs || []).map(legCard).join("") || `<div class="hint-text">No route legs available.</div>`;
-  plotLegs(boardMap, boardLayer, route.legs);
+  $("boardLegStrip").innerHTML = (selected.legs || []).map(legCard).join("") || `<div class="hint-text">No route legs available.</div>`;
+  plotLegs(boardMap, boardLayer, selected.legs);
   $("boardLeaveLater").hidden = true;
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
-  $("boardLeaveNowBtn").onclick = () => startNav({ legs: route.legs, mode: route.destination.name }, time, arrive);
+  $("boardLeaveNowBtn").onclick = () => startNav({ legs: selected.legs, mode: route.destination.name }, time, arrive);
 }
 
 function renderBoard() {
@@ -273,6 +294,7 @@ function findDestination(dest) {
           alert(data.error);
         } else {
           customRoute = data;
+          customRouteOptionId = null;
           renderBoard();
           showScreen("board");
         }

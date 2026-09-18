@@ -1,9 +1,13 @@
-from lta_client import train_service_alerts, bus_arrival, get_2hr_weather, safe_call
+from datetime import datetime, timezone, timedelta
+from lta_client import train_service_alerts, bus_arrival, get_2hr_weather, get_rainfall, get_public_holidays, safe_call
 from parsing import (
     parse_train_alerts, get_station_crowd, is_weather_ok_for_cycling, parse_bus_arrival,
-    get_station_forecast, get_forecast_for_time
+    get_station_forecast, get_forecast_for_time, parse_public_holidays, is_public_holiday,
+    is_school_vacation
 )
-from recommend import recommend_for_arjun, rank_options
+from recommend import recommend_for_arjun, rank_options, find_better_departure_window
+
+SGT = timezone(timedelta(hours=8))
 
 
 def run_live():
@@ -15,26 +19,60 @@ def run_live():
     serangoon_crowd = safe_call(get_station_crowd, "NEL", "NE12", fallback={"level": "NA"})
 
     weather = safe_call(get_2hr_weather, fallback=None)
-    cycling_ok = is_weather_ok_for_cycling(weather) if weather else True
+    rainfall = safe_call(get_rainfall, fallback=None)
+    cycling_ok = is_weather_ok_for_cycling(weather, rainfall_raw=rainfall) if weather else True
 
     bus_raw = safe_call(bus_arrival, "65259", fallback={"Services": []})
     bus_services = parse_bus_arrival(bus_raw)
 
-    # Proactive: what will Punggol look like at Arjun's usual 8:00 departure?
+    # Public holiday + school vacation check — both soften the forecast-based
+    # nudges below, since PCDForecast reflects normal-weekday patterns that
+    # don't hold on either kind of day.
+    holidays_raw = safe_call(get_public_holidays, fallback={"result": {"records": []}})
+    holiday_dates = parse_public_holidays(holidays_raw)
+    today_str = datetime.now(SGT).date().isoformat()
+    today_is_holiday = is_public_holiday(holiday_dates, today_str)
+    today_is_school_vacation = is_school_vacation(today_str)
+
+    is_atypical_day = today_is_holiday or today_is_school_vacation
+    if today_is_holiday:
+        atypical_reason = "public holiday"
+    elif today_is_school_vacation:
+        atypical_reason = "school vacation period"
+    else:
+        atypical_reason = ""
+
+    # Proactive: check the forecast relative to the ACTUAL current time (not a
+    # hardcoded hour), and scan ahead up to 60 min for a better window to leave.
+    now_str = datetime.now(SGT).isoformat()
     punggol_forecast_slots = safe_call(get_station_forecast, "NEL", "NE17", fallback=[])
-    forecast_at_8am = get_forecast_for_time(punggol_forecast_slots, "2026-09-18T08:00:00+08:00")
+    forecast_now = get_forecast_for_time(punggol_forecast_slots, now_str)
+    delay_suggestion = find_better_departure_window(punggol_forecast_slots, now_str, max_delay_minutes=60)
 
     recommendations = recommend_for_arjun(
         parsed, punggol_crowd, serangoon_crowd, cycling_ok, bus_services,
-        forecast_level=forecast_at_8am["level"]
+        forecast_level=forecast_now["level"],
+        delay_suggestion=delay_suggestion,
+        is_atypical_day=is_atypical_day,
+        atypical_reason=atypical_reason
     )
     ranked = rank_options(recommendations)
 
-    print("Ranked recommendations for Arjun (live data):")
+    # Freshness timestamp: this data layer only ever returns a live snapshot —
+    # it does not cache or know about connectivity state. When wrapped in an
+    # API endpoint, this generated_at is what lets the frontend show "last
+    # updated Xmin ago" or a stale-data banner if the commuter loses signal
+    # underground (see WRITEUP.md for the full offline-behavior boundary).
+    result = {
+        "generated_at": now_str,
+        "recommendations": ranked
+    }
+
+    print(f"Ranked recommendations for Arjun (live data, generated {now_str}):")
     for opt, score in ranked:
         print(f" - [{score}] {opt['mode']}: {opt['reason']}")
 
-    return ranked
+    return result
 
 
 # --- Saved test fixture: simulated disruption scenario ---

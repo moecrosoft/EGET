@@ -39,6 +39,24 @@ def get_2hr_weather():
     return r.json()
 
 
+def get_rainfall():
+    r = requests.get("https://api-open.data.gov.sg/v2/real-time/api/rainfall")
+    r.raise_for_status()
+    return r.json()
+
+
+def get_public_holidays():
+    """
+    Official MOM public holidays dataset via data.gov.sg, verified live:
+    https://data.gov.sg/datasets/d_149b61ad0a22f61c09dc80f2df5bbec8/view
+    Free, no key required, Open Data Licence.
+    """
+    url = "https://data.gov.sg/api/action/datastore_search?resource_id=d_149b61ad0a22f61c09dc80f2df5bbec8"
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.json()
+
+
 def safe_call(func, *args, fallback=None, **kwargs):
     """Runs an API call safely — returns fallback instead of crashing if it fails."""
     try:

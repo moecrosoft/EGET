@@ -78,10 +78,6 @@ body { background: var(--bg); color: var(--ink); }
 .clock {
   font: 500 12px "Roboto Mono", monospace;
   color: var(--ink-4);
-  background: none;
-  border: none;
-  padding: 4px 2px;
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 5px;

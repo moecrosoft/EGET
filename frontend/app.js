@@ -820,22 +820,15 @@ $("themeToggle").onclick = () => {
 };
 
 // ============================= Clock + boot =============================
-let clockShowsWeather = false;
-
 function tickClock() {
   const weather = journeyData?.weather;
-  if (clockShowsWeather && weather) {
+  if (weather) {
     const icon = weather.isRainingNow ? ICON.rain : ICON.sun;
     $("clock").innerHTML = `${pathSvg(icon, { size: 13, stroke: "#9aa0a6", width: 2 })}<span>${weather.nowcast || "No forecast"}</span>`;
   } else {
-    $("clock").textContent = nowClock();
+    $("clock").textContent = "Loading weather…";
   }
 }
-
-$("clock").onclick = () => {
-  clockShowsWeather = !clockShowsWeather;
-  tickClock();
-};
 
 initMaps();
 tickClock();

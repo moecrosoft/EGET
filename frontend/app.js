@@ -764,7 +764,7 @@ async function loadBusRoute(serviceNo, direction = null) {
         const isEnd = i === 0 || i === stops.length - 1;
         L.circleMarker([s.latitude, s.longitude], {
           radius: isEnd ? 6 : 4,
-          color: "#0e1114",
+          color: "#8791ab",
           weight: 1.5,
           fillColor: "#f2f0ec",
           fillOpacity: 1,

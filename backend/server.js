@@ -4,11 +4,19 @@ import { fileURLToPath } from "node:url";
 
 // Resolve .env relative to this file's location (repo root, one level up
 // from backend/), not process.cwd() — so `cd backend && npm start` and
-// `node backend/server.js` from the repo root both find the same .env. This
-// must run before any other import's top-level code, since agent.js /
-// arjunAgent.js now build their SDK clients lazily (see getAnthropic()/
-// getGroq() in those files) — but dotenv still needs to be configured this
-// early so process.env is populated before any request handler runs.
+// `node backend/server.js` from the repo root both find the same .env.
+// NOTE: placing this call before the imports below does NOT guarantee it
+// runs before their top-level code — ES module imports are hoisted and
+// fully evaluated before any of this file's own statements, regardless of
+// textual order. The invariant that actually matters: no statically-imported
+// module in this graph may read process.env at module-evaluation time.
+// agent.js / arjunAgent.js satisfy this by building their SDK clients
+// lazily (see getAnthropic()/getGroq() in those files), deferred until a
+// request actually comes in — by which point this dotenv.config() call
+// (which itself runs synchronously, early in this file's own execution)
+// has already populated process.env. If a future import ever needs an env
+// var at module-evaluation time, it must read it lazily too, not rely on
+// import order here.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 

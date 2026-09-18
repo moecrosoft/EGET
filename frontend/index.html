@@ -100,17 +100,6 @@
         </div>
 
         <button id="boardLeaveNowBtn" class="cta-primary">Leave now</button>
-
-        <div class="ai-playground">
-          <div class="ai-playground-title">AI playground (dev)</div>
-          <div class="ai-playground-buttons">
-            <button class="ai-btn" data-ai-route="generate-text">Generate text</button>
-            <button class="ai-btn" data-ai-route="generate-image">Generate image</button>
-            <button class="ai-btn" data-ai-route="embeddings">Embeddings</button>
-            <button class="ai-btn" data-ai-route="chat">Chat</button>
-          </div>
-          <pre id="aiPlaygroundResult" class="ai-playground-result" hidden></pre>
-        </div>
       </section>
 
       <section class="screen" data-screen="near" id="screen-near">
@@ -119,8 +108,12 @@
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6f7378" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"></path></svg>
           </button>
           <div class="near-title">Stops near you</div>
+          <div class="near-mode-tabs" id="nearModeTabs">
+            <button class="near-mode-tab active" data-mode="bus">Bus</button>
+            <button class="near-mode-tab" data-mode="mrt">MRT/LRT</button>
+          </div>
           <div id="nearMap" class="map-panel map-near"></div>
-          <div class="near-caption">Live arrivals from LTA, refreshed on open</div>
+          <div class="near-caption" id="nearCaption">Live arrivals from LTA, refreshed on open</div>
           <div id="nearStopList" class="stop-list">Loading&hellip;</div>
         </div>
 

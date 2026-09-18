@@ -291,6 +291,8 @@ function findDestination(dest) {
 
 // ============================= Near you =============================
 let nearStops = [];
+let nearStations = [];
+let nearMode = "bus";
 let nearStopIdx = null;
 let meLatLng = null;
 
@@ -305,30 +307,28 @@ function pinIcon(count) {
     iconAnchor: [10, 30],
   });
 }
+function stationPinIcon(name) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="eget-pin">${pathSvg(ICON.train, { size: 15, stroke: "#0e1114", width: 2 })}<span>${name}</span></div>`,
+    iconSize: [0, 0],
+    iconAnchor: [10, 30],
+  });
+}
+
+document.querySelectorAll(".near-mode-tab").forEach((btn) => {
+  btn.onclick = () => {
+    nearMode = btn.dataset.mode;
+    document.querySelectorAll(".near-mode-tab").forEach((b) => b.classList.toggle("active", b === btn));
+    renderNearList();
+  };
+});
 
 function renderNearList() {
   $("nearList").hidden = false;
   $("nearDetail").hidden = true;
-
-  $("nearStopList").innerHTML = nearStops
-    .map(
-      (s, i) => `<button class="stop-row" data-idx="${i}">
-        ${pathSvg(ICON.bus, { size: 30, stroke: "#1f8a57", width: 1.6 })}
-        <span class="stop-row-text">
-          <span class="stop-row-name">${s.description}</span>
-          <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.services.length} bus${s.services.length === 1 ? "" : "es"}</span>
-        </span>
-        <span class="stop-row-eta">
-          <span class="stop-row-eta-mins">${s.services[0]?.nextArrivalMins ?? "?"}m</span>
-          <span class="stop-row-eta-arrow">&rarr;</span>
-        </span>
-      </button>`
-    )
-    .join("") || `<div class="hint-text">No bus stops found nearby.</div>`;
-
-  document.querySelectorAll("#nearStopList .stop-row").forEach((row) => {
-    row.onclick = () => openStop(Number(row.dataset.idx));
-  });
+  $("nearCaption").textContent =
+    nearMode === "bus" ? "Live arrivals from LTA, refreshed on open" : "Nearest stations, by straight-line distance";
 
   nearLayer.clearLayers();
   const bounds = [];
@@ -336,12 +336,55 @@ function renderNearList() {
     L.marker(meLatLng, { icon: haloIcon() }).addTo(nearLayer);
     bounds.push(meLatLng);
   }
-  nearStops.forEach((s) => {
-    if (s.latitude == null || s.longitude == null) return;
-    const ll = [s.latitude, s.longitude];
-    L.marker(ll, { icon: pinIcon(s.services.length) }).on("click", () => openStop(nearStops.indexOf(s))).addTo(nearLayer);
-    bounds.push(ll);
-  });
+
+  if (nearMode === "bus") {
+    $("nearStopList").innerHTML = nearStops
+      .map(
+        (s, i) => `<button class="stop-row" data-idx="${i}">
+          ${pathSvg(ICON.bus, { size: 30, stroke: "#1f8a57", width: 1.6 })}
+          <span class="stop-row-text">
+            <span class="stop-row-name">${s.description}</span>
+            <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.services.length} bus${s.services.length === 1 ? "" : "es"}</span>
+          </span>
+          <span class="stop-row-eta">
+            <span class="stop-row-eta-mins">${s.services[0]?.nextArrivalMins ?? "?"}m</span>
+            <span class="stop-row-eta-arrow">&rarr;</span>
+          </span>
+        </button>`
+      )
+      .join("") || `<div class="hint-text">No bus stops found nearby.</div>`;
+
+    document.querySelectorAll("#nearStopList .stop-row").forEach((row) => {
+      row.onclick = () => openStop(Number(row.dataset.idx));
+    });
+
+    nearStops.forEach((s) => {
+      if (s.latitude == null || s.longitude == null) return;
+      const ll = [s.latitude, s.longitude];
+      L.marker(ll, { icon: pinIcon(s.services.length) }).on("click", () => openStop(nearStops.indexOf(s))).addTo(nearLayer);
+      bounds.push(ll);
+    });
+  } else {
+    $("nearStopList").innerHTML = nearStations
+      .map(
+        (s) => `<div class="stop-row" style="cursor:default">
+          ${pathSvg(ICON.train, { size: 30, stroke: "#9e28b5", width: 1.6 })}
+          <span class="stop-row-text">
+            <span class="stop-row-name">${s.name}</span>
+            <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.lines.join("/")}</span>
+          </span>
+        </div>`
+      )
+      .join("") || `<div class="hint-text">No MRT/LRT stations found nearby.</div>`;
+
+    nearStations.forEach((s) => {
+      if (s.latitude == null || s.longitude == null) return;
+      const ll = [s.latitude, s.longitude];
+      L.marker(ll, { icon: stationPinIcon(s.name) }).addTo(nearLayer);
+      bounds.push(ll);
+    });
+  }
+
   if (bounds.length) nearMap.fitBounds(bounds, { padding: [24, 24] });
   setTimeout(() => nearMap.invalidateSize(), 0);
 }
@@ -442,6 +485,7 @@ function findNearby() {
         const res = await fetch(`${API}/api/nearby?lat=${coords.latitude}&lng=${coords.longitude}`);
         const data = await res.json();
         nearStops = (data.busStops?.busStops || []).map((s) => ({ ...s, services: s.services || [] }));
+        nearStations = data.stations?.stations || [];
         renderNearList();
       } catch (err) {
         $("nearStopList").innerHTML = `<div class="hint-text">Couldn't load nearby stops: ${err.message}</div>`;
@@ -452,34 +496,6 @@ function findNearby() {
     }
   );
 }
-
-// ============================= AI playground (dev) =============================
-const AI_BODY = {
-  "generate-text": { prompt: "Recommend a route from Punggol to one-north" },
-  "generate-image": { prompt: "a map icon" },
-  embeddings: { input: "Punggol Field station" },
-  chat: { messages: [{ role: "user", content: "Is my route affected today?" }] },
-};
-
-document.querySelectorAll(".ai-btn").forEach((btn) => {
-  btn.onclick = async () => {
-    const route = btn.dataset.aiRoute;
-    const out = $("aiPlaygroundResult");
-    out.hidden = false;
-    out.textContent = "Loading…";
-    try {
-      const res = await fetch(`${API}/api/ai/${route}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(AI_BODY[route]),
-      });
-      const data = await res.json();
-      out.textContent = `${res.status} ${res.statusText}\n${JSON.stringify(data, null, 2)}`;
-    } catch (err) {
-      out.textContent = "Error: " + err.message;
-    }
-  };
-});
 
 $("themeToggle").onclick = () => {
   const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";

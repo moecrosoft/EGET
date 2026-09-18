@@ -246,6 +246,22 @@ body { background: var(--bg); color: var(--ink); }
 .near-title { font: 800 24px "Work Sans", sans-serif; color: var(--ink); letter-spacing: -0.02em; }
 .near-caption { font: 400 10.5px "Work Sans", sans-serif; color: var(--ink-4); margin-top: -4px; }
 
+.near-mode-tabs { display: flex; gap: 8px; }
+.near-mode-tab {
+  flex: 1;
+  margin: 0;
+  min-height: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 9px 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: 700 12.5px "Work Sans", sans-serif;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.near-mode-tab.active { background: var(--bus); border-color: var(--bus); color: #fff; }
+
 .stop-list { display: flex; flex-direction: column; gap: 10px; }
 .stop-row {
   display: flex;
@@ -424,36 +440,6 @@ body { background: var(--bg); color: var(--ink); }
 .near-cta-title { font: 800 18px "Work Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
 .near-cta-sub { font: 500 14px "Work Sans", sans-serif; color: rgba(255, 255, 255, 0.85); }
 
-/* ---- AI playground (dev) ---- */
-.ai-playground { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }
-.ai-playground-title { font: 700 11px "Work Sans", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-5); }
-.ai-playground-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.ai-btn {
-  margin: 0;
-  min-height: auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 8px 13px;
-  background: transparent;
-  color: var(--ink-3);
-  font: 600 12px "Work Sans", sans-serif;
-  cursor: pointer;
-}
-.ai-btn:hover { border-color: var(--ink-4); color: var(--ink); }
-.ai-playground-result {
-  margin: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font: 400 11.5px/1.5 "Roboto Mono", monospace;
-  color: var(--ink-3);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 180px;
-  overflow-y: auto;
-}
-.ai-playground-result[hidden] { display: none; }
 
 /* ---- Leaflet marker tweaks ---- */
 .eget-pin {

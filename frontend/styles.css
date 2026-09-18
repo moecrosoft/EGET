@@ -75,7 +75,18 @@ body { background: var(--bg); color: var(--ink); }
   padding: 16px 18px 6px;
 }
 .brand { font: 800 14px "Work Sans", sans-serif; letter-spacing: 0.16em; color: var(--ink); }
-.clock { font: 500 12px "Roboto Mono", monospace; color: var(--ink-4); }
+.clock {
+  font: 500 12px "Roboto Mono", monospace;
+  color: var(--ink-4);
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.clock svg { flex: none; }
 
 .theme-toggle {
   margin: 0;
@@ -322,7 +333,12 @@ body { background: var(--bg); color: var(--ink); }
 #nearStopSheet .sheet-handle-row { display: none; }
 
 /* ---- Bus route (full-screen map + pull-up sheet) ---- */
-#screen-route.active { height: 100%; padding: 0; overflow: hidden; }
+/* position:relative so .route-back-overlay (an absolute-positioned direct
+   child) anchors to this screen's own box instead of the page root — every
+   other overlay button in the app sits inside a wrapper that already has
+   this, this one didn't, so it rendered up near the topbar and then got
+   clipped away entirely once overflow:hidden was added here. */
+#screen-route.active { height: 100%; padding: 0; overflow: hidden; position: relative; }
 .route-back-overlay {
   position: absolute;
   top: 12px;

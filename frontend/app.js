@@ -302,6 +302,7 @@ async function refreshJourney() {
   const time = nowClock();
   journeyData = await fetchJourney(time);
   if (!customRoute) renderBoard();
+  tickClock();
 }
 
 $("tripBar").onclick = () => showScreen("plan");
@@ -819,9 +820,22 @@ $("themeToggle").onclick = () => {
 };
 
 // ============================= Clock + boot =============================
+let clockShowsWeather = false;
+
 function tickClock() {
-  $("clock").textContent = nowClock();
+  const weather = journeyData?.weather;
+  if (clockShowsWeather && weather) {
+    const icon = weather.isRainingNow ? ICON.rain : ICON.sun;
+    $("clock").innerHTML = `${pathSvg(icon, { size: 13, stroke: "#9aa0a6", width: 2 })}<span>${weather.nowcast || "No forecast"}</span>`;
+  } else {
+    $("clock").textContent = nowClock();
+  }
 }
+
+$("clock").onclick = () => {
+  clockShowsWeather = !clockShowsWeather;
+  tickClock();
+};
 
 initMaps();
 tickClock();

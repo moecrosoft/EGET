@@ -1,10 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 import { toolDefinitions, executeTool } from "./tools.js";
 import { getJourneyOptions } from "./journeyPlanner.js";
 import { respondToCommuterSchema, respondToCommuterJsonSchema } from "./schemas.js";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
 
 const SYSTEM_PROMPT = `You are Commute Companion, tailored for Arjun: a multi-modal, flexible-start
 commuter travelling Punggol -> one-north. He can cycle to Punggol interchange and take the
@@ -58,6 +58,25 @@ const RESPOND_TO_COMMUTER_TOOL = {
 
 const ALL_TOOLS = [...reusedToolDefinitions, GET_JOURNEY_OPTIONS_TOOL, RESPOND_TO_COMMUTER_TOOL];
 
+// Groq's chat completions API is OpenAI-compatible: tool definitions use the
+// `{ type: "function", function: { name, description, parameters } }` shape,
+// not Anthropic's `{ name, description, input_schema }`. tools.js's
+// toolDefinitions stay Anthropic-shaped (agent.js, untouched, still relies on
+// that), so we map to the Groq/OpenAI shape here at the point we build the
+// tools array actually sent to Groq.
+function toGroqTool(anthropicShapedTool) {
+  return {
+    type: "function",
+    function: {
+      name: anthropicShapedTool.name,
+      description: anthropicShapedTool.description,
+      parameters: anthropicShapedTool.input_schema,
+    },
+  };
+}
+
+const GROQ_TOOLS = ALL_TOOLS.map(toGroqTool);
+
 function currentTimeHHMM() {
   const d = new Date();
   const hh = String(d.getHours()).padStart(2, "0");
@@ -82,29 +101,33 @@ async function executeArjunTool(name, input) {
  * free-text final answer.
  */
 export async function chatWithArjunAgent({ message, history = [] }) {
-  const conversation = [...history, { role: "user", content: message }];
+  const conversation = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history,
+    { role: "user", content: message },
+  ];
 
   for (let turn = 0; turn < 6; turn++) {
-    const response = await anthropic.messages.create({
+    const response = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      tools: ALL_TOOLS,
+      tools: GROQ_TOOLS,
       messages: conversation,
     });
 
-    const toolUses = response.content.filter((b) => b.type === "tool_use");
+    const responseMessage = response.choices[0].message;
+    const toolCalls = responseMessage.tool_calls || [];
 
-    const finalCall = toolUses.find((c) => c.name === RESPOND_TOOL_NAME);
+    const finalCall = toolCalls.find((c) => c.function.name === RESPOND_TOOL_NAME);
     if (finalCall) {
-      return respondToCommuterSchema.parse(finalCall.input);
+      return respondToCommuterSchema.parse(JSON.parse(finalCall.function.arguments));
     }
 
-    if (toolUses.length === 0) {
+    if (toolCalls.length === 0) {
       // Model produced only text with turns still remaining — nudge it back
       // toward tool use / the final structured answer on the next turn by
       // just continuing the loop with its text appended to history.
-      conversation.push({ role: "assistant", content: response.content });
+      conversation.push(responseMessage);
       conversation.push({
         role: "user",
         content:
@@ -113,35 +136,34 @@ export async function chatWithArjunAgent({ message, history = [] }) {
       continue;
     }
 
-    conversation.push({ role: "assistant", content: response.content });
+    conversation.push(responseMessage);
 
-    const toolResults = await Promise.all(
-      toolUses.map(async (call) => {
-        const result = await executeArjunTool(call.name, call.input);
+    const toolResultMessages = await Promise.all(
+      toolCalls.map(async (call) => {
+        const input = JSON.parse(call.function.arguments);
+        const result = await executeArjunTool(call.function.name, input);
         return {
-          type: "tool_result",
-          tool_use_id: call.id,
+          role: "tool",
+          tool_call_id: call.id,
           content: JSON.stringify(result),
         };
       })
     );
 
-    conversation.push({ role: "user", content: toolResults });
+    conversation.push(...toolResultMessages);
   }
 
   // Turn cap reached without a respond_to_commuter call — force it.
-  const forcedResponse = await anthropic.messages.create({
+  const forcedResponse = await groq.chat.completions.create({
     model: MODEL,
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    tools: ALL_TOOLS,
-    tool_choice: { type: "tool", name: RESPOND_TOOL_NAME },
+    tools: GROQ_TOOLS,
+    tool_choice: { type: "function", function: { name: RESPOND_TOOL_NAME } },
     messages: conversation,
   });
 
-  const forcedCall = forcedResponse.content.find(
-    (b) => b.type === "tool_use" && b.name === RESPOND_TOOL_NAME
-  );
+  const forcedToolCalls = forcedResponse.choices[0].message.tool_calls || [];
+  const forcedCall = forcedToolCalls.find((c) => c.function.name === RESPOND_TOOL_NAME);
 
   if (!forcedCall) {
     throw new Error(
@@ -149,5 +171,5 @@ export async function chatWithArjunAgent({ message, history = [] }) {
     );
   }
 
-  return respondToCommuterSchema.parse(forcedCall.input);
+  return respondToCommuterSchema.parse(JSON.parse(forcedCall.function.arguments));
 }

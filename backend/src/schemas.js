@@ -4,11 +4,12 @@ import { z } from "zod";
 //
 // IMPORTANT: `respondToCommuterSchema` (Zod, used to validate the model's tool
 // input at runtime) and `respondToCommuterJsonSchema` (plain JSON Schema, used
-// as the `input_schema` of the `respond_to_commuter` tool sent to the
-// Anthropic API) describe the SAME shape. Anthropic's tools API takes JSON
-// Schema, not Zod objects, so we can't derive one from the other here — if
-// you add/rename/retype a field in one, make the matching change in the
-// other or the model's tool calls will fail `.parse()`.
+// as the `input_schema`/`parameters` of the `respond_to_commuter` tool sent to
+// the LLM's tool-calling API — currently Groq, via arjunAgent.js) describe the
+// SAME shape. Tool-calling APIs take JSON Schema, not Zod objects, so we can't
+// derive one from the other here — if you add/rename/retype a field in one,
+// make the matching change in the other or the model's tool calls will fail
+// `.parse()`.
 
 const crowdLevelEnum = ["l", "m", "h", "NA"];
 const confidenceEnum = ["low", "medium", "high"];

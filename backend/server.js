@@ -1,10 +1,25 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
+// Resolve .env relative to this file's location (repo root, one level up
+// from backend/), not process.cwd() — so `cd backend && npm start` and
+// `node backend/server.js` from the repo root both find the same .env.
+//
+// NOTE: this must happen via dynamic import() below, not a static top-level
+// `import` of the modules that read process.env at module-eval time (e.g.
+// agent.js/arjunAgent.js construct their SDK clients at import time). ES
+// module static imports are hoisted and fully evaluated before ANY of this
+// file's own top-level code runs, regardless of textual order — so a
+// dotenv.config() call placed between static imports would run too late.
+// Dynamic import() defers loading those modules until after dotenv.config()
+// has actually populated process.env.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+
+const {
   getTrainAlerts,
   getBusArrivals,
   getAlternateRoutes,
@@ -13,15 +28,16 @@ import {
   getAllStations,
   findStationByName,
   getBusRouteStops,
-} from "./src/ltaClient.js";
-import { chatWithAgent } from "./src/agent.js";
-import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from "./src/monitor.js";
-import { nextScenario } from "./src/mockData.js";
-import { getJourneyOptions } from "./src/journeyPlanner.js";
-import { planRoute } from "./src/routePlanner.js";
-import aiRouter from "../api/index.js";
+} = await import("./src/ltaClient.js");
+const { chatWithAgent } = await import("./src/agent.js");
+const { upsertProfile, getNudges, clearNudges, startMonitor, profiles } = await import(
+  "./src/monitor.js"
+);
+const { nextScenario } = await import("./src/mockData.js");
+const { getJourneyOptions } = await import("./src/journeyPlanner.js");
+const { planRoute } = await import("./src/routePlanner.js");
+const { default: aiRouter } = await import("../api/index.js");
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -30,6 +46,12 @@ app.use(aiRouter);
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
     "\n[WARN] ANTHROPIC_API_KEY is not set. The chat/agent endpoints will fail until you add it to .env.\n"
+  );
+}
+
+if (!process.env.GROQ_API_KEY) {
+  console.warn(
+    "\n[WARN] GROQ_API_KEY is not set. The /ai/arjun/chat endpoint will fail until you add it to .env.\n"
   );
 }
 

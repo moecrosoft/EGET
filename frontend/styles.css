@@ -69,6 +69,7 @@ body { background: var(--bg); color: var(--ink); }
 
 .topbar {
   flex: none;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -85,6 +86,10 @@ body { background: var(--bg); color: var(--ink); }
 .clock svg { flex: none; }
 
 .theme-toggle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   margin: 0;
   min-height: auto;
   border: 1px solid var(--border-strong);

@@ -92,7 +92,7 @@ const MAPS_BY_SCREEN = {
 function showScreen(name) {
   screen = name;
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
-  $("tabbar").hidden = name === "board" || name === "nav";
+  $("tabbar").hidden = name !== "plan";
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   (MAPS_BY_SCREEN[name]?.() || []).forEach((m) => m && setTimeout(() => m.invalidateSize(), 0));
   if (name === "near" && nearStops.length === 0) findNearby();
@@ -429,6 +429,8 @@ $("nearBackBtn").onclick = () => {
   nearStopIdx = null;
   renderNearList();
 };
+
+$("nearHomeBtn").onclick = () => showScreen("plan");
 
 function findNearby() {
   if (!navigator.geolocation) {

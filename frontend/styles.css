@@ -335,8 +335,51 @@ body { background: var(--bg); color: var(--ink); }
 .bus-row-meta span:last-child { font: 400 11px "Work Sans", sans-serif; color: var(--ink-4); }
 .bus-row-eta { font: 700 22px "Roboto Mono", monospace; color: var(--ink); flex: none; }
 
-.route-section { display: flex; flex-direction: column; gap: 11px; border-top: 1px solid var(--border); padding-top: 14px; }
 .route-label { font: 700 12px "Work Sans", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-4); }
+
+/* ---- Route bottom sheet ---- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 24;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.sheet-backdrop[hidden] { display: none; }
+.sheet-backdrop.open { opacity: 1; }
+
+.route-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) translateY(100%);
+  width: 100%;
+  max-width: 480px;
+  max-height: 78vh;
+  overflow-y: auto;
+  background: var(--surface-alt);
+  border-radius: 18px 18px 0 0;
+  padding: 6px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  z-index: 25;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  transition: transform 0.25s ease;
+}
+.route-sheet[hidden] { display: none; }
+.route-sheet.open { transform: translateX(-50%) translateY(0); }
+
+.sheet-handle-row {
+  margin: 0 auto;
+  min-height: auto;
+  padding: 10px 40px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.sheet-handle { display: block; width: 36px; height: 4px; border-radius: 999px; background: var(--border-strong); }
 
 .stop-seq { display: flex; flex-direction: column; }
 .stop-seq-row { display: flex; align-items: center; gap: 13px; position: relative; padding: 4px 0; }

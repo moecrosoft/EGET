@@ -436,19 +436,34 @@ function openStop(idx) {
   document.querySelectorAll("#nearBusRows .bus-row").forEach((row) => {
     row.onclick = () => {
       document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.toggle("active", r === row));
+      openRouteSheet();
       loadBusRoute(row.dataset.service);
     };
   });
-
-  const first = stop.services[0];
-  if (first) loadBusRoute(first.serviceNo);
-  else {
-    $("nearRouteLabel").textContent = "";
-    $("nearStopSeq").innerHTML = "";
-    nearRouteLayer.clearLayers();
-  }
-  setTimeout(() => nearRouteMap.invalidateSize(), 0);
 }
+
+function openRouteSheet() {
+  $("routeSheetBackdrop").hidden = false;
+  $("routeSheet").hidden = false;
+  requestAnimationFrame(() => {
+    $("routeSheetBackdrop").classList.add("open");
+    $("routeSheet").classList.add("open");
+  });
+  setTimeout(() => nearRouteMap.invalidateSize(), 260);
+}
+
+function closeRouteSheet() {
+  $("routeSheetBackdrop").classList.remove("open");
+  $("routeSheet").classList.remove("open");
+  setTimeout(() => {
+    $("routeSheetBackdrop").hidden = true;
+    $("routeSheet").hidden = true;
+  }, 250);
+  document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.remove("active"));
+}
+
+$("routeSheetClose").onclick = closeRouteSheet;
+$("routeSheetBackdrop").onclick = closeRouteSheet;
 
 async function loadBusRoute(serviceNo) {
   document.querySelectorAll("#nearBusRows .bus-row").forEach((r) => r.classList.toggle("active", r.dataset.service === serviceNo));
@@ -489,10 +504,14 @@ async function loadBusRoute(serviceNo) {
 
 $("nearBackBtn").onclick = () => {
   nearStopIdx = null;
+  closeRouteSheet();
   renderNearList();
 };
 
-$("nearHomeBtn").onclick = () => showScreen("plan");
+$("nearHomeBtn").onclick = () => {
+  closeRouteSheet();
+  showScreen("plan");
+};
 
 function findNearby() {
   if (!navigator.geolocation) {

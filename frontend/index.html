@@ -129,11 +129,6 @@
             <div id="nearStopMeta" class="stop-detail-meta"></div>
           </div>
           <div id="nearBusRows" class="bus-rows"></div>
-          <div class="route-section">
-            <div id="nearRouteLabel" class="route-label"></div>
-            <div id="nearRouteMap" class="map-panel map-route"></div>
-            <div id="nearStopSeq" class="stop-seq"></div>
-          </div>
         </div>
       </section>
 
@@ -161,6 +156,16 @@
         </div>
       </section>
     </main>
+
+    <div id="routeSheetBackdrop" class="sheet-backdrop" hidden></div>
+    <div id="routeSheet" class="route-sheet" hidden>
+      <button id="routeSheetClose" class="sheet-handle-row">
+        <span class="sheet-handle"></span>
+      </button>
+      <div id="nearRouteLabel" class="route-label"></div>
+      <div id="nearRouteMap" class="map-panel map-route"></div>
+      <div id="nearStopSeq" class="stop-seq"></div>
+    </div>
 
     <div class="near-cta-wrap" id="nearCtaWrap">
       <button class="near-cta" id="nearCta" aria-label="Near you – bus stops">

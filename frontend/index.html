@@ -41,9 +41,10 @@
             <span class="spine-sq"></span>
           </div>
           <div class="route-fields">
-            <div class="field">
+            <div class="field field-to">
               <div class="field-label">From</div>
-              <div class="field-value">Current location</div>
+              <input id="planFromInput" class="field-input" placeholder="Current location" autocomplete="off" />
+              <div id="planFromSuggest" class="suggest-list" hidden></div>
             </div>
             <div class="field field-to">
               <div class="field-label">To</div>

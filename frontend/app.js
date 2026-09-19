@@ -255,7 +255,7 @@ function renderBoardPersona(data) {
 
 function renderBoardCustom(route) {
   updateWeatherBanner(null);
-  $("tripBarLabel").textContent = `Your location → ${route.destination.name}`;
+  $("tripBarLabel").textContent = `${selectedFrom?.name || "Your location"} → ${route.destination.name}`;
 
   const options = route.options || [];
   const selectedId = customRouteOptionId || route.recommendedId || options[0]?.id;
@@ -496,6 +496,56 @@ $("navEndBtn").onclick = () => {
 // cleared as soon as they type again — typing invalidates the pick, so a
 // stale lat/lng never gets silently reused for edited text.
 let selectedDest = null;
+// Same idea for the "From" field — null means "use the device's live
+// location" (the original, default behavior); set once a real place is
+// picked, so the trip can start from anywhere, not just where you're
+// physically standing.
+let selectedFrom = null;
+
+let fromSuggestDebounce = null;
+$("planFromInput").addEventListener("input", () => {
+  selectedFrom = null;
+  const q = $("planFromInput").value.trim();
+  clearTimeout(fromSuggestDebounce);
+  if (q.length < 2) { hideFromSuggestions(); return; }
+  fromSuggestDebounce = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API}/api/geocode-suggest?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      renderFromSuggestions(data.suggestions || []);
+    } catch {
+      hideFromSuggestions();
+    }
+  }, 300);
+});
+$("planFromInput").addEventListener("blur", () => setTimeout(hideFromSuggestions, 150));
+$("planFromInput").addEventListener("keydown", (e) => {
+  if (e.key === "Escape") hideFromSuggestions();
+});
+
+function hideFromSuggestions() {
+  $("planFromSuggest").hidden = true;
+  $("planFromSuggest").innerHTML = "";
+}
+
+function renderFromSuggestions(suggestions) {
+  if (!suggestions.length) return hideFromSuggestions();
+  $("planFromSuggest").innerHTML = suggestions
+    .map(
+      (s, i) => `<button type="button" class="suggest-item" data-idx="${i}">
+        ${s.name}<span class="suggest-item-sub">${s.address}</span>
+      </button>`
+    )
+    .join("");
+  $("planFromSuggest").hidden = false;
+  suggestions.forEach((s, i) => {
+    $("planFromSuggest").querySelector(`[data-idx="${i}"]`).onclick = () => {
+      $("planFromInput").value = s.name;
+      selectedFrom = s;
+      hideFromSuggestions();
+    };
+  });
+}
 
 $("planFindBtn").onclick = () => findDestination($("planToInput").value.trim());
 $("planToInput").addEventListener("keydown", (e) => {
@@ -554,11 +604,41 @@ function renderSuggestions(suggestions) {
   });
 }
 
+async function planFrom(fromLat, fromLng, dest) {
+  $("planFindBtn").textContent = "Finding the best route…";
+  try {
+    const time = nowClock();
+    const toParams = selectedDest ? `&toLat=${selectedDest.lat}&toLng=${selectedDest.lng}` : "";
+    const res = await fetch(
+      `${API}/api/plan-route?lat=${fromLat}&lng=${fromLng}&to=${encodeURIComponent(dest)}&time=${time}${toParams}`
+    );
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+    } else {
+      customRoute = data;
+      customRouteOptionId = null;
+      renderBoard();
+      showScreen("board");
+    }
+  } catch (err) {
+    alert("Couldn't find a route: " + err.message);
+  } finally {
+    $("planFindBtn").textContent = "Find my route";
+  }
+}
+
 function findDestination(dest) {
   if (!dest) {
     customRoute = null;
     renderBoard();
     showScreen("board");
+    return;
+  }
+  // A picked "From" place skips geolocation entirely — the trip can start
+  // anywhere, not just wherever the device physically is.
+  if (selectedFrom) {
+    planFrom(selectedFrom.lat, selectedFrom.lng, dest);
     return;
   }
   if (!navigator.geolocation) {
@@ -567,29 +647,7 @@ function findDestination(dest) {
   }
   $("planFindBtn").textContent = "Locating…";
   navigator.geolocation.getCurrentPosition(
-    async ({ coords }) => {
-      $("planFindBtn").textContent = "Finding the best route…";
-      try {
-        const time = nowClock();
-        const toParams = selectedDest ? `&toLat=${selectedDest.lat}&toLng=${selectedDest.lng}` : "";
-        const res = await fetch(
-          `${API}/api/plan-route?lat=${coords.latitude}&lng=${coords.longitude}&to=${encodeURIComponent(dest)}&time=${time}${toParams}`
-        );
-        const data = await res.json();
-        if (data.error) {
-          alert(data.error);
-        } else {
-          customRoute = data;
-          customRouteOptionId = null;
-          renderBoard();
-          showScreen("board");
-        }
-      } catch (err) {
-        alert("Couldn't find a route: " + err.message);
-      } finally {
-        $("planFindBtn").textContent = "Find my route";
-      }
-    },
+    ({ coords }) => planFrom(coords.latitude, coords.longitude, dest),
     (err) => {
       alert("Couldn't get your location: " + err.message);
       $("planFindBtn").textContent = "Find my route";

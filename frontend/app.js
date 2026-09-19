@@ -156,7 +156,13 @@ function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.dataset.screen === name));
   $("nearCtaWrap").hidden = name !== "plan";
   (MAPS_BY_SCREEN[name]?.() || []).forEach((m) => m && setTimeout(() => m.invalidateSize(), 0));
-  if (name === "near" && nearStops.length === 0) findNearby();
+  if (name === "near") {
+    if (nearStops.length === 0) findNearby();
+    else refreshNearArrivals();
+    startNearPoll();
+  } else {
+    stopNearPoll();
+  }
 }
 
 $("nearCta").onclick = () => showScreen("near");
@@ -545,6 +551,35 @@ function findDestination(dest) {
   );
 }
 
+// Native browser speech-to-text (Web Speech API) — no server round trip,
+// no new dependency. Chrome/Edge only; button hides itself where unsupported.
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognitionCtor && $("planMicBtn")) {
+  const recognition = new SpeechRecognitionCtor();
+  recognition.lang = "en-SG";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (e) => {
+    const heard = e.results[0][0].transcript.trim();
+    // "navigate me to X" / "take me to X" / "go to X" -> just the destination
+    const dest = heard.replace(/^(navigate|take|go|get)\s+(me\s+)?to\s+/i, "").trim() || heard;
+    $("planToInput").value = dest;
+    selectedDest = null;
+    hideSuggestions();
+    findDestination(dest);
+  };
+  recognition.onerror = () => $("planMicBtn").classList.remove("listening");
+  recognition.onend = () => $("planMicBtn").classList.remove("listening");
+
+  $("planMicBtn").onclick = () => {
+    $("planMicBtn").classList.add("listening");
+    recognition.start();
+  };
+} else if ($("planMicBtn")) {
+  $("planMicBtn").hidden = true;
+}
+
 function directionsToStop(stop) {
   if (!navigator.geolocation) {
     alert("Geolocation isn't supported by this browser.");
@@ -624,7 +659,7 @@ function renderNearList() {
   $("nearList").hidden = false;
   $("nearDetail").hidden = true;
   $("nearCaption").textContent =
-    nearMode === "bus" ? "Live arrivals from LTA, refreshed on open" : "Nearest stations, by straight-line distance";
+    nearMode === "bus" ? "Live arrivals from LTA, updating automatically" : "Nearest stations, by straight-line distance";
 
   nearLayer.clearLayers();
   const bounds = [];
@@ -811,6 +846,35 @@ function findNearby() {
       $("nearStopList").innerHTML = `<div class="hint-text">Couldn't get your location: ${err.message}</div>`;
     }
   );
+}
+
+// Live bus timings — re-fetch on a timer instead of making the person
+// reload the page to see updated arrivals. Reuses the last known
+// location rather than re-prompting geolocation every tick.
+let nearPoll = null;
+
+function stopNearPoll() {
+  clearInterval(nearPoll);
+  nearPoll = null;
+}
+
+function startNearPoll() {
+  stopNearPoll();
+  nearPoll = setInterval(refreshNearArrivals, 20000);
+}
+
+async function refreshNearArrivals() {
+  if (!meLatLng) return;
+  try {
+    const res = await fetch(`${API}/api/nearby?lat=${meLatLng[0]}&lng=${meLatLng[1]}`);
+    const data = await res.json();
+    nearStops = (data.busStops?.busStops || []).map((s) => ({ ...s, services: s.services || [] }));
+    nearStations = data.stations?.stations || [];
+    if (nearStopIdx != null) openStop(nearStopIdx);
+    else renderNearList();
+  } catch {
+    // silently skip this tick — try again next interval
+  }
 }
 
 $("themeToggle").onclick = () => {

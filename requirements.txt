@@ -1,9 +1,0 @@
-requests==2.34.2
-python-dotenv==1.2.3
-requests
-python-dotenv
-
-
-groq 
-langchain 
-langchain-groq

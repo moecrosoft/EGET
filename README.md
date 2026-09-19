@@ -74,9 +74,6 @@ call fails):
 backend/server.js       Express app — every /api/* route
 backend/src/            LTA/OneMap/weather clients, route planning, decision logic, AI agents
 frontend/                index.html + app.js + styles.css — the actual UI, no build step
-lta_client.py, parsing.py,
-recommend.py, main.py    Separate Python decision-logic exploration —
-                         see ARJUN_DECISION_SERVICE.md (below)
 ```
 
 ## Getting started
@@ -84,7 +81,7 @@ recommend.py, main.py    Separate Python decision-logic exploration —
 Requires Node 20+.
 
 ```bash
-cd backend && npm install        # also installs ../api per its postinstall script
+cd backend && npm install
 cp ../.env.example ../.env       # fill in the keys below
 npm run dev                      # http://localhost:8787
 ```
@@ -106,20 +103,6 @@ Both `LTA_ACCOUNT_KEY` and `ONEMAP_TOKEN` are free, self-service signups
 
 `Dockerfile` and `Procfile` both run `backend/server.js` directly — that's
 the one thing that needs to be deployed; it serves the frontend itself.
-
-## The team's other component
-
-[`ARJUN_DECISION_SERVICE.md`](ARJUN_DECISION_SERVICE.md) documents a
-separate Python module built alongside this app: real LTA/data.gov.sg data
-pulling, parsing, and a scored/ranked decision-logic layer for a specific
-commuter persona (Arjun: Punggol → one-north, optimises for comfort over
-speed). It's a standalone, thoroughly-documented exploration of the
-decision-logic problem — not wired into this app's live server, since the
-integrated app above implements its own version of that logic
-(`backend/src/decisionLogic.js`) for the deployed product. Worth reading
-for the reasoning behind what "comfort-optimised" and "honest uncertainty"
-actually mean for this problem, tested throughout against live API
-responses rather than assumed from docs.
 
 ## Team
 

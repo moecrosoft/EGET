@@ -178,8 +178,10 @@ export async function getStationCrowdForecast(trainLineCode, stationCode) {
       time: entry.Start.slice(11, 16), // "HH:MM" — sliced directly from the +08:00 SGT string
       crowdLevel: String(entry.CrowdLevel).toLowerCase(),
     }));
-  } catch (err) {
-    console.error("[ltaClient] crowd forecast failed:", err.message);
+  } catch {
+    // Already degrades gracefully (empty forecast, no crash) — quota/rate
+    // limit failures on this endpoint are common enough not to warrant an
+    // alarming console.error for something the app already handles fine.
     return [];
   }
 }

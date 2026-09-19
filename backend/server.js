@@ -236,9 +236,26 @@ app.use(express.static(path.join(__dirname, "..", "frontend")));
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const HOST = "0.0.0.0";
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`Commute Companion backend running on http://localhost:${PORT}`);
   const intervalMs = Number(process.env.MONITOR_INTERVAL_MS) || 30000;
   startMonitor(intervalMs);
   console.log(`Proactive monitor sweeping every ${intervalMs / 1000}s`);
+});
+
+// Node's default for this is an unhandled crash with a confusing stack
+// trace — under --watch that just shows as "Failed running 'server.js'.
+// Waiting for file changes..." with no clue why. The actual cause is
+// almost always another instance of this same server already running
+// (e.g. left over from a previous npm run dev that wasn't stopped).
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `\n[ERROR] Port ${PORT} is already in use — another server.js is probably still running.\n` +
+        `Windows: netstat -ano | findstr :${PORT}   then   taskkill /PID <pid> /F\n` +
+        `Mac/Linux: lsof -i :${PORT}   then   kill <pid>\n`
+    );
+    process.exit(1);
+  }
+  throw err;
 });

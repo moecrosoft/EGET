@@ -345,13 +345,41 @@ function startNav(option, leaveTime, arriveTime, alternative) {
   $("navRainCard").hidden = true;
 
   plotLegs(navMap, navLayer, legs);
+  navMeMarker = null;
   showScreen("nav");
   startNavDisruptionPoll();
+  startNavTracking();
 }
 
 function stopNavDisruptionPoll() {
   clearInterval(navDisruptionPoll);
   navDisruptionPoll = null;
+}
+
+// Live GPS position on the nav map — a moving dot, not just the static
+// route. watchPosition (not a poll) fires on the browser's own cadence as
+// your location actually changes.
+let navWatchId = null;
+let navMeMarker = null;
+
+function startNavTracking() {
+  stopNavTracking();
+  if (!navigator.geolocation) return;
+  navWatchId = navigator.geolocation.watchPosition(
+    ({ coords }) => {
+      const ll = [coords.latitude, coords.longitude];
+      if (navMeMarker) navMeMarker.setLatLng(ll);
+      else navMeMarker = L.marker(ll, { icon: haloIcon() }).addTo(navLayer);
+    },
+    () => {}, // tracking is a nice-to-have — silently skip on denial/error, nav still works without it
+    { enableHighAccuracy: true, maximumAge: 5000 }
+  );
+}
+
+function stopNavTracking() {
+  if (navWatchId != null) navigator.geolocation.clearWatch(navWatchId);
+  navWatchId = null;
+  navMeMarker = null;
 }
 
 // Finds a live LTA traffic incident (accident, breakdown, roadworks) that
@@ -437,10 +465,12 @@ $("navKeepGoingBtn").onclick = () => {
 
 $("navPlanBtn").onclick = () => {
   stopNavDisruptionPoll();
+  stopNavTracking();
   showScreen("board");
 };
 $("navEndBtn").onclick = () => {
   stopNavDisruptionPoll();
+  stopNavTracking();
   showScreen("board");
 };
 

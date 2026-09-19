@@ -190,3 +190,48 @@ export async function searchPlaces(text, limit = 5) {
     lng: Number(r.LONGITUDE),
   }));
 }
+
+const LINE_PREFIX = {
+  NS: "NSL", EW: "EWL", CG: "EWL", NE: "NEL", CC: "CCL", CE: "CCL", DT: "DTL", TE: "TEL",
+  BP: "BPL", SE: "SLRT", SW: "SLRT", PE: "PLRT", PW: "PLRT", PTC: "PLRT", STC: "SLRT",
+};
+
+// Cached for the process lifetime, like ltaClient.js's bus stops/routes
+// caches. Our old hand-maintained MRT_STATIONS list only covered ~38 of
+// the network's ~220 real stations (interchanges and "major" stations
+// only) — "nearest station" was wrong for anyone standing near any of the
+// other ~180. Paginates OneMap's own search index instead ("<NAME> MRT/LRT
+// STATION (<CODE>)"), drops exit entries, dedupes by the code so an
+// interchange's several name variants collapse to one real station.
+let stationsCache = null;
+
+export async function getAllStationsFromOneMap() {
+  if (stationsCache) return stationsCache;
+  const seen = new Map();
+  for (const term of ["MRT STATION", "LRT STATION"]) {
+    let page = 1;
+    let totalPages = 40; // safety cap — real total is usually well under this
+    while (page <= totalPages) {
+      const data = await fetchSearchPage(term, page).catch(() => null);
+      const results = data?.results || [];
+      if (!results.length) break;
+      totalPages = Math.min(totalPages, data.totalNumPages || totalPages);
+      for (const r of results) {
+        if (/EXIT/i.test(r.SEARCHVAL)) continue;
+        const m = r.SEARCHVAL.match(/^(.*?)\s+(?:MRT|LRT)\s+STATION\s*\(([^)]+)\)/i);
+        if (!m) continue;
+        const codes = m[2].split("/").map((c) => c.trim());
+        if (seen.has(codes[0])) continue;
+        seen.set(codes[0], {
+          name: m[1].trim().replace(/\b\w/g, (c) => c.toUpperCase()),
+          lines: [...new Set(codes.map((c) => LINE_PREFIX[c.match(/^[A-Z]+/)?.[0]] || c))],
+          latitude: Number(r.LATITUDE),
+          longitude: Number(r.LONGITUDE),
+        });
+      }
+      page++;
+    }
+  }
+  stationsCache = [...seen.values()];
+  return stationsCache;
+}

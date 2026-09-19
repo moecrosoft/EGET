@@ -8,6 +8,7 @@ import {
   MRT_STATIONS,
 } from "./mockData.js";
 import { normalizeLine } from "./lineCodes.js";
+import { getAllStationsFromOneMap } from "./onemapClient.js";
 
 const BASE_URL = "https://datamall2.mytransport.sg/ltaodataservice";
 
@@ -337,7 +338,15 @@ export async function getBusRouteStops(serviceNo, direction = null) {
 }
 
 export async function getNearbyStations(lat, lng, limit = 5) {
-  return { source: "static-reference", stations: nearest(MRT_STATIONS, lat, lng, limit) };
+  try {
+    const all = await getAllStationsFromOneMap();
+    if (all.length) return { source: "onemap-live", stations: nearest(all, lat, lng, limit) };
+  } catch (err) {
+    console.error("[ltaClient] live station list failed, using the small static one:", err.message);
+  }
+  // Our own hand-picked ~38 stations — only the fallback now, since it's
+  // missing most of the real ~220-station network (see onemapClient.js).
+  return { source: "static-fallback", stations: nearest(MRT_STATIONS, lat, lng, limit) };
 }
 
 export async function getNearbyBusStops(lat, lng, limit = 5) {

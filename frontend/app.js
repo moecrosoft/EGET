@@ -1,6 +1,19 @@
 const API = ""; // same-origin
 const $ = (id) => document.getElementById(id);
 
+// Disruption notifications. Android Chrome only allows them through a service
+// worker, and both need HTTPS (or localhost) — on plain http the in-app swap
+// card still shows, just without the system notification.
+const swReady = "serviceWorker" in navigator && window.isSecureContext
+  ? navigator.serviceWorker.register("/sw.js").catch(() => null)
+  : Promise.resolve(null);
+
+async function pushAlert(title, body) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const reg = await swReady;
+  if (reg) reg.showNotification(title, { body, tag: "eget-disruption", vibrate: [200, 100, 200] });
+}
+
 // ============================= Theme (light/dark) =============================
 const THEME_KEY = "eget-theme";
 function applyTheme(theme) {
@@ -368,6 +381,7 @@ function startNav(option, leaveTime, arriveTime, alternatives) {
   navAlternatives = alternatives || [];
   navAlternative = null;
   navDisruptionShown = false;
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
   $("navRainCard").hidden = true;
 
   plotLegs(navMap, navLayer, legs);
@@ -539,6 +553,7 @@ function startNavDisruptionPoll() {
 
 function showDisruptionCard(title, body, icon = ICON.rain) {
   navDisruptionShown = true;
+  pushAlert(title, body);
   $("navRainCardIconPath").setAttribute("d", icon);
   $("navRainCardTitle").textContent = title;
   $("navRainCardBody").textContent = body;
@@ -850,20 +865,35 @@ function renderNearList() {
   } else {
     $("nearStopList").innerHTML = nearStations
       .map(
-        (s) => `<div class="stop-row" style="cursor:default">
+        (s, i) => `<button class="stop-row" data-idx="${i}">
           ${pathSvg(ICON.train, { size: 30, stroke: "#9e28b5", width: 1.6 })}
           <span class="stop-row-text">
             <span class="stop-row-name">${s.name}</span>
             <span class="stop-row-sub">${s.distanceKm.toFixed(2)} km · ${s.lines.join("/")}</span>
           </span>
-        </div>`
+          <span class="stop-row-eta-arrow">&rarr;</span>
+        </button>`
       )
       .join("") || `<div class="hint-text">No MRT/LRT stations found nearby.</div>`;
+
+    // Tapping a station plans a route there directly — same picked-
+    // suggestion pattern the destination search itself uses, so it
+    // routes to the station's exact coordinates, not a re-geocode guess.
+    document.querySelectorAll("#nearStopList .stop-row").forEach((row, i) => {
+      row.onclick = () => {
+        const s = nearStations[i];
+        showScreen("plan");
+        $("planToInput").value = s.name;
+        selectedDest = { name: s.name, lat: s.latitude, lng: s.longitude };
+        hideSuggestions();
+        findDestination(s.name);
+      };
+    });
 
     nearStations.forEach((s) => {
       if (s.latitude == null || s.longitude == null) return;
       const ll = [s.latitude, s.longitude];
-      L.marker(ll, { icon: stationPinIcon(s.name) }).addTo(nearLayer);
+      L.marker(ll, { icon: stationPinIcon(s.name) }).on("click", () => document.querySelectorAll("#nearStopList .stop-row")[nearStations.indexOf(s)]?.click()).addTo(nearLayer);
       bounds.push(ll);
     });
   }

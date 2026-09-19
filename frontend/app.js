@@ -409,9 +409,26 @@ function disruptedAlertForRoute(legs, alerts) {
   return null;
 }
 
+// Demo/testing hook: append ?simulate=rain | accident | trainalert to the
+// URL before starting nav to see the reactive swap-card flow without
+// waiting for (or faking) a real disruption. Doesn't touch the real
+// detection logic below — just short-circuits into the same UI it drives.
+const NAV_SIMULATIONS = {
+  rain: () => showDisruptionCard("It's raining", `Heavy Thundery Showers (simulated) at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`, ICON.rain),
+  accident: () => showDisruptionCard("Accident on your route", "(Simulated) Vehicle breakdown reported on your bus's road. Swap to " + navAlternative.mode + " to avoid it — arrives around the same time.", ICON.warning),
+  trainalert: () => showDisruptionCard("Line disrupted", `(Simulated) Delay due to a technical fault. Swap to ${navAlternative.mode} instead — arrives around the same time.`, ICON.train),
+};
+
 function startNavDisruptionPoll() {
   stopNavDisruptionPoll();
   if (!navAlternative) return;
+
+  const sim = NAV_SIMULATIONS[new URLSearchParams(location.search).get("simulate")];
+  if (sim) {
+    setTimeout(sim, 3000); // small delay so the normal nav screen is visible first
+    return;
+  }
+
   const check = async () => {
     if (navDisruptionShown || !navAlternative) return;
     try {

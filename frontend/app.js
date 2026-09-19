@@ -11,7 +11,8 @@ const swReady = "serviceWorker" in navigator && window.isSecureContext
 async function pushAlert(title, body) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const reg = await swReady;
-  if (reg) reg.showNotification(title, { body, tag: "eget-disruption", vibrate: [200, 100, 200] });
+  const clean = body.replace(/\s*\(simulated\)\s*/gi, " ").replace(/\s+/g, " ").trim();
+  if (reg) reg.showNotification(title, { body: clean, tag: "eget-disruption", vibrate: [200, 100, 200] });
 }
 
 // ============================= Theme (light/dark) =============================
@@ -378,7 +379,7 @@ function startNav(option, leaveTime, arriveTime, alternatives) {
     : "Last leg of the trip";
   $("navArrive").textContent = arriveTime;
 
-  navAlternatives = alternatives || [];
+  navAlternatives = (alternatives || []).filter((o) => !usesMode(o.legs, "CYCLE")); // never offer a cycling swap
   navAlternative = null;
   navDisruptionShown = false;
   if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
@@ -462,9 +463,9 @@ function demoAlternative() {
   return navAlternatives[0] || { mode: "a different route", legs: navCurrentLegs, totalTimeSeconds: navCurrentLegs.reduce((s, l) => s + (l.durationSeconds || 0), 0) };
 }
 const NAV_SIMULATIONS = {
-  rain: () => offerSwap("It's raining", "Heavy Thundery Showers (simulated) at your location.", ICON.rain, demoAlternative()),
-  accident: () => offerSwap("Accident on your route", "(Simulated) Vehicle breakdown reported on your bus's road.", ICON.warning, demoAlternative()),
-  trainalert: () => offerSwap("Line disrupted", "(Simulated) Delay due to a technical fault.", ICON.train, demoAlternative()),
+  rain: () => offerRainSwap("Heavy Thundery Showers (simulated) at your location.") || offerSwap("It's raining", "Heavy Thundery Showers (simulated) at your location.", ICON.rain, demoAlternative()),
+  accident: () => offerBusSwap("(Simulated) Vehicle breakdown reported on your bus's road.") || offerSwap("Accident on your route", "(Simulated) Vehicle breakdown reported on your bus's road.", ICON.warning, demoAlternative()),
+  trainalert: () => offerTrainSwap("(Simulated) Delay due to a technical fault.", railCodes(navCurrentLegs)[0]) || offerSwap("Line disrupted", "(Simulated) Delay due to a technical fault.", ICON.train, demoAlternative()),
 };
 
 const usesMode = (legs, mode) => (legs || []).some((l) => l.mode === mode);
@@ -474,7 +475,7 @@ const busRoutes = (legs) => (legs || []).filter((l) => l.mode === "BUS").map((l)
 // Fastest alternative that actually avoids this disruption — never just "the other option".
 function pickAlternative(avoids, cost = optionTotalMinutes) {
   return navAlternatives
-    .filter((o) => avoids(o.legs || []))
+    .filter((o) => !usesMode(o.legs, "CYCLE") && avoids(o.legs || []))
     .sort((a, b) => cost(a) - cost(b))[0] || null;
 }
 
@@ -508,9 +509,9 @@ function offerBusSwap(text, incidents) {
   return offerSwap("Accident on your route", text, ICON.warning, alt);
 }
 
-// MRT disrupted: fastest route that doesn't ride the affected line (another line, or bus).
+// MRT disrupted: another MRT line that avoids the fault if one exists, otherwise bus.
 function offerTrainSwap(text, lineCode, title = "Line disrupted") {
-  return offerSwap(title, text, ICON.train, pickAlternative((legs) => !railCodes(legs).includes(lineCode)));
+  return offerSwap(title, text, ICON.train, pickAlternative((legs) => !railCodes(legs).includes(lineCode), (o) => optionTotalMinutes(o) + (railCodes(o.legs).length ? 0 : 1000)));
 }
 
 function startNavDisruptionPoll() {

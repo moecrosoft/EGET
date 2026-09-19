@@ -551,35 +551,6 @@ function findDestination(dest) {
   );
 }
 
-// Native browser speech-to-text (Web Speech API) — no server round trip,
-// no new dependency. Chrome/Edge only; button hides itself where unsupported.
-const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRecognitionCtor && $("planMicBtn")) {
-  const recognition = new SpeechRecognitionCtor();
-  recognition.lang = "en-SG";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onresult = (e) => {
-    const heard = e.results[0][0].transcript.trim();
-    // "navigate me to X" / "take me to X" / "go to X" -> just the destination
-    const dest = heard.replace(/^(navigate|take|go|get)\s+(me\s+)?to\s+/i, "").trim() || heard;
-    $("planToInput").value = dest;
-    selectedDest = null;
-    hideSuggestions();
-    findDestination(dest);
-  };
-  recognition.onerror = () => $("planMicBtn").classList.remove("listening");
-  recognition.onend = () => $("planMicBtn").classList.remove("listening");
-
-  $("planMicBtn").onclick = () => {
-    $("planMicBtn").classList.add("listening");
-    recognition.start();
-  };
-} else if ($("planMicBtn")) {
-  $("planMicBtn").hidden = true;
-}
-
 function directionsToStop(stop) {
   if (!navigator.geolocation) {
     alert("Geolocation isn't supported by this browser.");

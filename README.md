@@ -16,29 +16,47 @@ an accident, or an MRT disruption hits your route while you're on it.
 ### Plan a trip
 - Search a destination with autocomplete (known MRT/LRT stations match
   first, so short/ambiguous queries like "sembawang" resolve to the real
-  station, not a random same-named building)
+  station, not a random same-named building) — the "From" field is
+  editable the same way, so a trip can start from anywhere, not just your
+  current location
 - Real turn-by-turn directions from OneMap — bus, MRT/LRT, and cycling
   legs, not just straight-line distance
-- Two ranked options when there's a genuine trade-off: **Shortest**
-  (fastest overall) and **Comfort** (fewest changes), never a fabricated
-  duplicate when nothing beats the fastest option
+- Up to three real options per search: **Shortest** (fastest overall),
+  **Comfort** (the most comfortable *other* itinerary OneMap actually
+  returned — fewest transfers, then least walking), and **Cycle** — never
+  a fabricated duplicate, only shown when a genuinely different itinerary
+  exists
+- Weather-aware reasoning next to the recommended option (e.g. "Raining
+  now — a non-cycling option would stay dry", or current conditions
+  folded into the reason text) — the same idea Arjun's board uses,
+  generalized to any search
+- "Leave N min later" suggestions when a route's rail line is forecast to
+  meaningfully quiet down within the hour, using real LTA crowd-forecast
+  data averaged across the line (not a per-station lookup — see
+  `CLAUDE.md` for why)
 - Every leg shows its real MRT/LRT line color (NS/EW/NE/CC/DT/TE, straight
   from LTA's official colour spec), a "Change at [stop]" callout for every
   transfer, and total trip time
 
 ### Near You
 - Nearby bus stops and MRT/LRT stations from your live location, with live
-  arrival times from LTA DataMall
+  arrival times from LTA DataMall — auto-refreshing every few seconds
+  while the screen's open, no manual reload needed
 - Tap a bus number for a full-screen route page: every stop plotted on
   the map, direction toggle for looping services, pull-up stop list
 
 ### While navigating
+- A live GPS position marker on the nav map, not just a static route
 - Live weather-aware rain warnings, with a swap-route prompt if you're
   cycling and it starts raining
 - Live LTA `TrafficIncidents` checked against your bus leg's path —
   accident nearby? Get a one-tap swap to an unaffected route
 - Live LTA `TrainServiceAlerts` checked against your MRT/LRT leg's line —
   same reactive swap if your line goes down mid-trip
+- The swap always picks the fastest available option that actually avoids
+  the specific problem (not just "the other option") — see the
+  `?simulate=rain` / `?simulate=accident` / `?simulate=trainalert` query
+  params below to demo this without waiting for real conditions
 
 ### Chat
 `POST /api/chat` (`backend/src/agent.js`) is a working Claude-backed chat
@@ -48,6 +66,21 @@ A second, persona-specific agentic loop for "Arjun" exists at
 `backend/src/arjunAgent.js` but isn't currently wired to a route — it
 powered an AI playground UI that was removed, and the API layer that
 exposed it (`api/`) was removed with it since nothing called it anymore.
+
+## Demoing the reactive reroute without waiting for real disruptions
+
+Real disruptions are rare — `TrainServiceAlerts.AffectedSegments` is empty
+on a normal day, and accidents/rain aren't on demand. To show the swap-card
+flow live: open the app with one of these appended to the URL, then search
+any destination and tap "Leave now" — the card appears ~3s after you land
+on the nav screen, using the exact same UI the real detection drives:
+
+- `?simulate=rain`
+- `?simulate=accident`
+- `?simulate=trainalert`
+
+It's a single-page app (no reloads between screens), so the query param
+stays in the address bar the whole time — no need to re-add it per screen.
 
 ## Live data, not mocks
 
@@ -78,13 +111,16 @@ call fails):
 
 ```
 .
-├── Dockerfile           # Node 20-slim container setup for Cloud Run
-├── Procfile             # Command entrypoint for process managers
-├── .env                 # API keys & secret environment configuration
+├── Dockerfile               # Node 20-slim container setup for Cloud Run
+├── Procfile                 # Command entrypoint for process managers (e.g. Heroku-style)
+├── .env                     # Real API keys, gitignored — see .env.example
+├── env.deploy.example.yaml  # Template for Cloud Run's --env-vars-file (YAML, not dotenv)
+├── env.deploy.yaml          # Real deploy secrets, gitignored — copy from the template above
+├── CLAUDE.md                # Orientation notes for AI-assisted work on this repo
 ├── backend/
-│   ├── server.js        # Express app — serves frontend & /api/* routes
-│   └── src/             # LTA/OneMap/weather clients, decision logic, AI agents
-└── frontend/            # index.html + app.js + styles.css — static UI assets
+│   ├── server.js            # Express app — serves frontend & every /api/* route
+│   └── src/                 # LTA/OneMap/weather clients, route planning, decision logic, AI agents
+└── frontend/                # index.html + app.js + styles.css — static UI, no build step
 ```
 
 ## Getting started
@@ -115,9 +151,9 @@ Both `LTA_ACCOUNT_KEY` and `ONEMAP_TOKEN` are free, self-service signups
 ## Deployment to Google Cloud Run
 
 The application deploys directly to Google Cloud Run using a containerized
-Node.js environment. The root `Dockerfile` builds the backend server and its
-module dependencies, while Express serves the static frontend assets
-directly.
+Node.js environment. The root `Dockerfile` builds the backend server, and
+Express serves the static frontend assets directly — nothing else to build
+or configure.
 
 ### Prerequisites
 
@@ -126,42 +162,38 @@ directly.
 
    ```bash
    gcloud auth login
-   gcloud config set project project-8fac92ef-d80d-4c08-a86
+   gcloud config set project YOUR_PROJECT_ID
    ```
 
-3. Make sure your local `.env` at the repository root contains all required
-   production API keys (`LTA_ACCOUNT_KEY`, `ONEMAP_TOKEN`,
-   `ANTHROPIC_API_KEY`, etc.).
+3. Copy `env.deploy.example.yaml` to `env.deploy.yaml` and fill in the same
+   real values that are in your local `.env`.
 
-> **Note:** Do not define `PORT` inside `.env` — Cloud Run automatically
-> assigns `PORT=8080`.
+   > **Important:** Cloud Run's `--env-vars-file` needs **YAML** syntax
+   > (`KEY: value`), not the `.env` file's dotenv syntax (`KEY=value`).
+   > Pointing `--env-vars-file` straight at `.env` will fail to parse or
+   > silently skip the variables — use `env.deploy.yaml`, not `.env`.
+   >
+   > Also don't put `PORT` in `env.deploy.yaml` — Cloud Run injects and
+   > manages its own (defaults to `8080`); `server.js` already falls back
+   > to `8080` on its own, and forcing a different value here makes the
+   > container listen on the wrong port and fail Cloud Run's health check.
 
 ### Deploy command
 
-Run this from the repository root:
+Run this from the repository root (the same directory as `Dockerfile`):
 
 ```bash
 gcloud run deploy eget \
   --source . \
   --region europe-west1 \
-  --project project-8fac92ef-d80d-4c08-a86 \
+  --project YOUR_PROJECT_ID \
   --allow-unauthenticated \
-  --clear-base-image \
-  --env-vars-file=.env
+  --env-vars-file=env.deploy.yaml
 ```
 
-Or, if running from inside the `backend/` folder, reference the root
-context (`..`):
-
-```bash
-gcloud run deploy eget \
-  --source .. \
-  --region europe-west1 \
-  --project project-8fac92ef-d80d-4c08-a86 \
-  --allow-unauthenticated \
-  --clear-base-image \
-  --env-vars-file=../.env
-```
+(On Windows PowerShell, either put it all on one line, or use PowerShell's
+backtick `` ` `` for line continuation instead of `\` — a trailing backslash
+isn't a continuation character there and will fail to parse.)
 
 ### What happens during deployment
 
@@ -170,11 +202,10 @@ gcloud run deploy eget \
    for `backend/`.
 3. The container image is pushed to Artifact Registry and instantiated in
    Cloud Run.
-4. Environment variables from `.env` are injected into the container runtime.
-5. The container binds to host `0.0.0.0` on port `8080` and serves the full
-   application live.
-
-**Live service URL:** https://eget-562866144161.europe-west1.run.app
+4. Environment variables from `env.deploy.yaml` are injected into the
+   container runtime.
+5. The container binds to host `0.0.0.0` on the port Cloud Run assigns
+   (`8080` by default) and serves the full application live.
 
 ## Team
 

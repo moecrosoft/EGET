@@ -41,6 +41,7 @@ import { upsertProfile, getNudges, clearNudges, startMonitor, profiles } from ".
 import { nextScenario } from "./src/mockData.js";
 import { getJourneyOptions } from "./src/journeyPlanner.js";
 import { planRoute } from "./src/routePlanner.js";
+import { transcribeStation } from "./src/transcribeClient.js";
 
 const app = express();
 app.use(cors());
@@ -49,6 +50,11 @@ app.use(express.json());
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
     "\n[WARN] ANTHROPIC_API_KEY is not set. The /api/chat endpoint will fail until you add it to .env.\n"
+  );
+}
+if (!process.env.GROQ_API_KEY) {
+  console.warn(
+    "\n[WARN] GROQ_API_KEY is not set. The /api/transcribe-station endpoint will fail until you add it to .env.\n"
   );
 }
 
@@ -165,6 +171,26 @@ app.get("/api/geocode-suggest", async (req, res) => {
     res.json({ suggestions: [...stationMatches, ...placeMatches].slice(0, 10) });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Voice input for the From/To fields on the "Where to?" screen: browser
+// records a short clip and POSTs the raw bytes here (no multipart form —
+// just the audio body with its own content type), Groq Whisper transcribes
+// it, and the transcript is matched against the known station list so the
+// client can auto-select a station the same way clicking a suggestion does.
+app.post("/api/transcribe-station", express.raw({ type: "audio/webm", limit: "5mb" }), async (req, res) => {
+  try {
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(503).json({ error: "GROQ_API_KEY is not set — see .env.example." });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: "No audio received." });
+    }
+    res.json(await transcribeStation(req.body));
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: "Couldn't transcribe that — try again." });
   }
 });
 

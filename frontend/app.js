@@ -64,7 +64,7 @@ function nowClock() {
 }
 
 // --- Leaflet maps: one dark map instance per screen that needs one ---
-let boardMap, boardLayer, nearMap, nearLayer, nearRouteMap, nearRouteLayer, navMap, navLayer;
+let boardMap, boardLayer, nearMap, nearLayer, nearRouteMap, nearRouteLayer, navMap, navLayer, navMeLayer;
 
 function createDarkMap(divId) {
   // fadeAnimation off: Leaflet's per-tile "will-change: opacity" (from its
@@ -92,6 +92,10 @@ function initMaps() {
 
   navMap = createDarkMap("navMap");
   navLayer = L.layerGroup().addTo(navMap);
+  // Separate from navLayer: plotLegs() clearLayers()s navLayer every time the
+  // route redraws (e.g. as completed legs drop off during live tracking) —
+  // the live position dot lives here instead so it isn't wiped along with it.
+  navMeLayer = L.layerGroup().addTo(navMap);
 }
 
 const LEG_MAP_STYLE = (leg) => ({ color: legColor(leg), weight: 4 });
@@ -312,6 +316,12 @@ let navAlternative = null; // { mode, legs } — the other option, offered as a 
 let navCurrentLegs = [];
 let navDisruptionShown = false;
 let navDisruptionPoll = null;
+let navLegIndex = 0; // which leg of navCurrentLegs the traveler is currently on
+let navOption = null;
+let navLeaveTime = null;
+let navArriveTime = null;
+let navWatchId = null; // navigator.geolocation.watchPosition handle, live for the duration of a trip
+let navMeMarker = null;
 
 function optionTotalMinutes(option) {
   if (option.totalTimeSeconds != null) return Math.round(option.totalTimeSeconds / 60);
@@ -319,28 +329,100 @@ function optionTotalMinutes(option) {
   return Math.round((option.legs || []).reduce((sum, l) => sum + (l.durationSeconds || 0), 0) / 60);
 }
 
+// Renders the turn-by-turn card for navLegIndex — called once at trip start
+// and again each time live tracking advances past a leg's endpoint.
+function renderNavStep() {
+  const legs = navCurrentLegs;
+  if (!legs.length) {
+    $("navInstruction").textContent = "Head to your first stop";
+    $("navInstructionSub").textContent = `Leave ${navLeaveTime} · ${optionTotalMinutes(navOption)} min total`;
+    $("navNextLabel").textContent = "";
+    return;
+  }
+  if (navLegIndex >= legs.length) {
+    $("navInstruction").textContent = "You've arrived";
+    $("navInstructionSub").textContent = "Trip complete";
+    $("navNextLabel").textContent = "";
+    return;
+  }
+  const current = legs[navLegIndex];
+  const next = legs[navLegIndex + 1];
+  $("navModeIcon").querySelector("path").setAttribute("d", MODE_ICON[current?.mode] || ICON.walk);
+  $("navInstruction").textContent =
+    `${current.mode === "CYCLE" ? "Cycle" : current.mode === "WALK" ? "Walk" : current.mode === "BUS" ? "Take bus" + (current.route ? " " + current.route : "") : "Take " + (current.route || "the train")}${current.to ? " to " + current.to : ""}`;
+  $("navInstructionSub").textContent = `Leave ${navLeaveTime} · ${optionTotalMinutes(navOption)} min total`;
+  $("navNextLabel").textContent = next
+    ? `Change to ${legModeLabel(next)}${current.to ? " at " + current.to : ""}`
+    : "Last leg of the trip";
+}
+
 function startNav(option, leaveTime, arriveTime, alternative) {
   const legs = option.legs || [];
   navCurrentLegs = legs;
-  const current = legs[0];
-  const next = legs[1];
-  $("navModeIcon").querySelector("path").setAttribute("d", MODE_ICON[current?.mode] || ICON.walk);
-  $("navInstruction").textContent = current
-    ? `${current.mode === "CYCLE" ? "Cycle" : current.mode === "WALK" ? "Walk" : current.mode === "BUS" ? "Take bus" + (current.route ? " " + current.route : "") : "Take " + (current.route || "the train")}${current.to ? " to " + current.to : ""}`
-    : "Head to your first stop";
-  $("navInstructionSub").textContent = `Leave ${leaveTime} · ${optionTotalMinutes(option)} min total`;
-  $("navNextLabel").textContent = next
-    ? `Change to ${legModeLabel(next)}${current?.to ? " at " + current.to : ""}`
-    : "Last leg of the trip";
+  navLegIndex = 0;
+  navOption = option;
+  navLeaveTime = leaveTime;
+  navArriveTime = arriveTime;
+  renderNavStep();
   $("navArrive").textContent = arriveTime;
 
   navAlternative = alternative || null;
   navDisruptionShown = false;
   $("navRainCard").hidden = true;
 
+  navMeLayer.clearLayers();
+  navMeMarker = null;
   plotLegs(navMap, navLayer, legs);
   showScreen("nav");
   startNavDisruptionPoll();
+  startNavLocationTracking();
+}
+
+// Live "blue dot" position tracking for the nav screen — the actual
+// live-navigation behavior: continuous GPS (not the one-shot
+// getCurrentPosition used elsewhere), a follow camera, and turn-by-turn
+// advancement as the traveler physically reaches the end of each leg.
+const NAV_ADVANCE_METERS = 60; // GPS + route-snapping slop near a transfer point
+function startNavLocationTracking() {
+  stopNavLocationTracking();
+  if (!navigator.geolocation) return;
+  let firstFix = true;
+  navWatchId = navigator.geolocation.watchPosition(
+    ({ coords }) => {
+      const latlng = [coords.latitude, coords.longitude];
+      if (navMeMarker) navMeMarker.setLatLng(latlng);
+      else navMeMarker = L.marker(latlng, { icon: haloIcon(), zIndexOffset: 1000 }).addTo(navMeLayer);
+
+      if (firstFix) {
+        navMap.setView(latlng, 17);
+        firstFix = false;
+      } else {
+        navMap.panTo(latlng, { animate: true });
+      }
+      advanceNavIfNeeded(latlng);
+    },
+    (err) => console.warn("[nav] live location tracking unavailable:", err.message),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+  );
+}
+
+function stopNavLocationTracking() {
+  if (navWatchId != null) navigator.geolocation.clearWatch(navWatchId);
+  navWatchId = null;
+}
+
+function advanceNavIfNeeded([lat, lng]) {
+  if (navLegIndex >= navCurrentLegs.length) return;
+  const leg = navCurrentLegs[navLegIndex];
+  const end = leg.coordinates?.[leg.coordinates.length - 1];
+  if (!end) return;
+  if (haversineMeters(lat, lng, end[0], end[1]) > NAV_ADVANCE_METERS) return;
+  navLegIndex++;
+  renderNavStep();
+  // Redraw with only the remaining legs, so the traveled portion drops off
+  // the map — fit:false keeps the follow camera from being fought by a
+  // sudden re-zoom every time a leg completes.
+  plotLegs(navMap, navLayer, navCurrentLegs.slice(navLegIndex), { fit: false });
 }
 
 function stopNavDisruptionPoll() {
@@ -431,23 +513,28 @@ $("navKeepGoingBtn").onclick = () => {
 
 $("navPlanBtn").onclick = () => {
   stopNavDisruptionPoll();
+  stopNavLocationTracking();
   showScreen("board");
 };
 $("navEndBtn").onclick = () => {
   stopNavDisruptionPoll();
+  stopNavLocationTracking();
   showScreen("board");
 };
 
 // ============================= Where to? =============================
-// Set only when the person picks a suggestion (real OneMap/station coords),
-// cleared as soon as they type again — typing invalidates the pick, so a
-// stale lat/lng never gets silently reused for edited text.
+// Set only when the person picks a suggestion (real OneMap/station coords)
+// or a voice match lands, cleared as soon as they type again — typing
+// invalidates the pick, so a stale lat/lng never gets silently reused for
+// edited text. selectedSource left null means "fall back to GPS", same as
+// before this field existed.
 let selectedDest = null;
+let selectedSource = null;
 
 $("planFindBtn").onclick = () => findDestination($("planToInput").value.trim());
 $("planToInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { hideSuggestions(); findDestination($("planToInput").value.trim()); }
-  if (e.key === "Escape") hideSuggestions();
+  if (e.key === "Enter") { hideSuggestions($("planSuggest")); findDestination($("planToInput").value.trim()); }
+  if (e.key === "Escape") hideSuggestions($("planSuggest"));
 });
 document.querySelectorAll(".recent-row").forEach((row) => {
   row.onclick = () => {
@@ -457,49 +544,132 @@ document.querySelectorAll(".recent-row").forEach((row) => {
   };
 });
 
-let suggestDebounce = null;
-$("planToInput").addEventListener("input", () => {
-  selectedDest = null;
-  const q = $("planToInput").value.trim();
-  clearTimeout(suggestDebounce);
-  if (q.length < 2) { hideSuggestions(); return; }
-  suggestDebounce = setTimeout(async () => {
+// Wires up a field's debounced-suggest / pick / clear-on-type behavior.
+// Shared by From and To so the two inputs stay in sync without duplicating
+// the fetch/render/select logic.
+function wireSuggestField(input, list, onSelect) {
+  input.addEventListener("input", () => {
+    onSelect(null);
+    fetchSuggestions(input.value.trim(), list, onSelect);
+  });
+  // Clicks inside the list fire before this, so a plain blur-hide is safe.
+  input.addEventListener("blur", () => setTimeout(() => hideSuggestions(list), 150));
+}
+
+const suggestDebounce = { from: null, to: null };
+function fetchSuggestions(q, list, onSelect, key = list === $("planFromSuggest") ? "from" : "to") {
+  clearTimeout(suggestDebounce[key]);
+  if (q.length < 2) { hideSuggestions(list); return; }
+  suggestDebounce[key] = setTimeout(async () => {
     try {
       const res = await fetch(`${API}/api/geocode-suggest?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      renderSuggestions(data.suggestions || []);
+      renderSuggestions(data.suggestions || [], list, onSelect);
     } catch {
-      hideSuggestions();
+      hideSuggestions(list);
     }
   }, 300);
-});
-// Clicks inside the list fire before this, so a plain blur-hide is safe.
-$("planToInput").addEventListener("blur", () => setTimeout(hideSuggestions, 150));
-
-function hideSuggestions() {
-  $("planSuggest").hidden = true;
-  $("planSuggest").innerHTML = "";
 }
 
-function renderSuggestions(suggestions) {
-  if (!suggestions.length) return hideSuggestions();
-  $("planSuggest").innerHTML = suggestions
+wireSuggestField($("planFromInput"), $("planFromSuggest"), (s) => { selectedSource = s; });
+wireSuggestField($("planToInput"), $("planSuggest"), (s) => {
+  selectedDest = s;
+  if (s) findDestination(s.name);
+});
+
+function hideSuggestions(list) {
+  list.hidden = true;
+  list.innerHTML = "";
+}
+
+function renderSuggestions(suggestions, list, onSelect) {
+  if (!suggestions.length) return hideSuggestions(list);
+  list.innerHTML = suggestions
     .map(
       (s, i) => `<button type="button" class="suggest-item" data-idx="${i}">
         ${s.name}<span class="suggest-item-sub">${s.address}</span>
       </button>`
     )
     .join("");
-  $("planSuggest").hidden = false;
+  list.hidden = false;
+  const input = list === $("planFromSuggest") ? $("planFromInput") : $("planToInput");
   suggestions.forEach((s, i) => {
-    $("planSuggest").querySelector(`[data-idx="${i}"]`).onclick = () => {
-      $("planToInput").value = s.name;
-      selectedDest = s;
-      hideSuggestions();
-      findDestination(s.name);
+    list.querySelector(`[data-idx="${i}"]`).onclick = () => {
+      input.value = s.name;
+      hideSuggestions(list);
+      onSelect(s);
     };
   });
 }
+
+// --- Voice input: record a short clip, transcribe + match it server-side ---
+// `button.onclick` toggles between "start" and "stop" for the duration of a
+// capture, then is always restored to "start" — by startVoiceCapture itself,
+// in both the success and error paths — so a later tap never gets stuck
+// bound to a stale stopIt from a capture that already finished.
+function startVoiceCapture(button, onResult) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert("Voice input isn't supported by this browser.");
+    return;
+  }
+  navigator.mediaDevices
+    .getUserMedia({ audio: true })
+    .then((stream) => {
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const chunks = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        button.classList.remove("recording");
+        button.onclick = () => startVoiceCapture(button, onResult);
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        try {
+          const res = await fetch(`${API}/api/transcribe-station`, {
+            method: "POST",
+            headers: { "Content-Type": "audio/webm" },
+            body: blob,
+          });
+          const data = await res.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            onResult(data);
+          }
+        } catch (err) {
+          alert("Couldn't transcribe that: " + err.message);
+        }
+      };
+      button.classList.add("recording");
+      recorder.start();
+      const stopIt = () => { if (recorder.state !== "inactive") recorder.stop(); };
+      setTimeout(stopIt, 5000); // auto-stop so a forgotten mic doesn't record forever
+      button.onclick = stopIt; // second tap stops early; onstop restores the start handler
+    })
+    .catch((err) => {
+      alert("Couldn't access the microphone: " + err.message);
+      button.onclick = () => startVoiceCapture(button, onResult);
+    });
+}
+
+function wireMic(button, input, list, onSelect) {
+  button.onclick = () =>
+    startVoiceCapture(button, ({ transcript, match }) => {
+      input.value = match ? match.name : transcript;
+      if (match) {
+        hideSuggestions(list);
+        onSelect(match);
+      } else {
+        onSelect(null);
+        fetchSuggestions(transcript, list, onSelect);
+      }
+    });
+}
+
+wireMic($("planFromMic"), $("planFromInput"), $("planFromSuggest"), (s) => { selectedSource = s; });
+wireMic($("planToMic"), $("planToInput"), $("planSuggest"), (s) => {
+  selectedDest = s;
+  if (s) findDestination(s.name);
+});
 
 function findDestination(dest) {
   if (!dest) {
@@ -508,35 +678,40 @@ function findDestination(dest) {
     showScreen("board");
     return;
   }
+  const go = async (lat, lng) => {
+    $("planFindBtn").textContent = "Finding the best route…";
+    try {
+      const time = nowClock();
+      const toParams = selectedDest ? `&toLat=${selectedDest.lat}&toLng=${selectedDest.lng}` : "";
+      const res = await fetch(
+        `${API}/api/plan-route?lat=${lat}&lng=${lng}&to=${encodeURIComponent(dest)}&time=${time}${toParams}`
+      );
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        customRoute = data;
+        customRouteOptionId = null;
+        renderBoard();
+        showScreen("board");
+      }
+    } catch (err) {
+      alert("Couldn't find a route: " + err.message);
+    } finally {
+      $("planFindBtn").textContent = "Find my route";
+    }
+  };
+  if (selectedSource) {
+    go(selectedSource.lat, selectedSource.lng);
+    return;
+  }
   if (!navigator.geolocation) {
     alert("Geolocation isn't supported by this browser.");
     return;
   }
   $("planFindBtn").textContent = "Locating…";
   navigator.geolocation.getCurrentPosition(
-    async ({ coords }) => {
-      $("planFindBtn").textContent = "Finding the best route…";
-      try {
-        const time = nowClock();
-        const toParams = selectedDest ? `&toLat=${selectedDest.lat}&toLng=${selectedDest.lng}` : "";
-        const res = await fetch(
-          `${API}/api/plan-route?lat=${coords.latitude}&lng=${coords.longitude}&to=${encodeURIComponent(dest)}&time=${time}${toParams}`
-        );
-        const data = await res.json();
-        if (data.error) {
-          alert(data.error);
-        } else {
-          customRoute = data;
-          customRouteOptionId = null;
-          renderBoard();
-          showScreen("board");
-        }
-      } catch (err) {
-        alert("Couldn't find a route: " + err.message);
-      } finally {
-        $("planFindBtn").textContent = "Find my route";
-      }
-    },
+    ({ coords }) => go(coords.latitude, coords.longitude),
     (err) => {
       alert("Couldn't get your location: " + err.message);
       $("planFindBtn").textContent = "Find my route";

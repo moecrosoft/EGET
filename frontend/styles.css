@@ -121,8 +121,8 @@ body { background: var(--bg); color: var(--ink); }
 .spine-sq { width: 10px; height: 10px; border-radius: 2px; background: var(--bus); }
 
 .route-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.field { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-.field-to { border-color: var(--border-focus); position: relative; }
+.field { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; position: relative; }
+.field-to { border-color: var(--border-focus); }
 .field-label { font: 500 10px "Work Sans", sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-5); }
 .field-value { font: 600 15px "Work Sans", sans-serif; color: var(--ink); margin-top: 4px; }
 .field-input {
@@ -130,12 +130,32 @@ body { background: var(--bg); color: var(--ink); }
   border: none;
   background: transparent;
   padding: 0;
+  padding-right: 26px;
   margin: 4px 0 0;
   font: 600 15px "Work Sans", sans-serif;
   color: var(--ink);
 }
 .field-input::placeholder { color: var(--ink-5); font-weight: 500; }
 .field-input:focus { outline: none; }
+
+.mic-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  margin: 0;
+  min-height: auto;
+  border: none;
+  border-radius: 999px;
+  padding: 4px;
+  background: transparent;
+  color: var(--ink-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.mic-btn:hover { color: var(--ink); }
+.mic-btn.recording { color: var(--danger, #e2605a); }
 
 .suggest-list {
   position: absolute;

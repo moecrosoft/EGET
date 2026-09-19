@@ -41,13 +41,20 @@
             <span class="spine-sq"></span>
           </div>
           <div class="route-fields">
-            <div class="field">
+            <div class="field field-from">
               <div class="field-label">From</div>
-              <div class="field-value">Current location</div>
+              <input id="planFromInput" class="field-input" placeholder="Current location" autocomplete="off" />
+              <button id="planFromMic" class="mic-btn" type="button" aria-label="Speak source station">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"></path><path d="M19 11a7 7 0 01-14 0M12 18v3"></path></svg>
+              </button>
+              <div id="planFromSuggest" class="suggest-list" hidden></div>
             </div>
             <div class="field field-to">
               <div class="field-label">To</div>
               <input id="planToInput" class="field-input" placeholder="Search a destination&hellip;" autocomplete="off" />
+              <button id="planToMic" class="mic-btn" type="button" aria-label="Speak destination station">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"></path><path d="M19 11a7 7 0 01-14 0M12 18v3"></path></svg>
+              </button>
               <div id="planSuggest" class="suggest-list" hidden></div>
             </div>
           </div>

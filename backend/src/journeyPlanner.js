@@ -1,6 +1,6 @@
 import { getTrainAlerts, getStationCrowdForecast } from "./ltaClient.js";
 import { getWeather } from "./weatherClient.js";
-import { getWalkCycleRoute, getPtRoute } from "./onemapClient.js";
+import { getWalkCycleRoute, getPtRoute, getPtItineraries } from "./onemapClient.js";
 import { decide } from "./decisionLogic.js";
 import { todayDateString, toOneMapTime } from "./dateUtils.js";
 
@@ -43,6 +43,20 @@ async function getCycleLrtRoute(time) {
   return { etaMinutes, legs };
 }
 
+// Rain fallback: door-to-door transit (bus and/or MRT) with walking capped
+// to ~300m per leg, then the itinerary with the least time on foot — so the
+// rain swap minimises exposure instead of just avoiding the bike.
+async function getLowWalkRoute(time) {
+  const date = todayDateString();
+  const itineraries = await cached(`pt:home-onenorth:TRANSIT-lowwalk:${time}`, 5 * 60 * 1000, () =>
+    getPtItineraries(HOME, ONE_NORTH, { mode: "TRANSIT", date, time: toOneMapTime(time), maxWalkDistance: 300, numItineraries: 3 })
+  );
+  const walkSeconds = (it) => (it.legs || []).filter((l) => l.mode === "WALK").reduce((n, l) => n + (l.durationSeconds || 0), 0);
+  const best = [...itineraries].sort((a, b) => walkSeconds(a) - walkSeconds(b) || a.totalTimeSeconds - b.totalTimeSeconds)[0];
+  if (!best) return null;
+  return { etaMinutes: Math.round(best.totalTimeSeconds / 60), legs: best.legs };
+}
+
 async function getBusOnlyRoute(time) {
   const date = todayDateString();
   const ptRoute = await cached(`pt:home-onenorth:BUS:${time}`, 5 * 60 * 1000, () =>
@@ -55,12 +69,13 @@ async function getBusOnlyRoute(time) {
 }
 
 export async function getJourneyOptions(time) {
-  const [weather, trainAlertsResult, crowdForecast, cycleLrtRoute, busOnlyRoute] = await Promise.all([
+  const [weather, trainAlertsResult, crowdForecast, cycleLrtRoute, busOnlyRoute, lowWalkRoute] = await Promise.all([
     getWeather(),
     getTrainAlerts(),
     getStationCrowdForecast(PUNGGOL_LRT_CROWD_CODE, PUNGGOL_INTERCHANGE_STATION_CODE),
     getCycleLrtRoute(time),
     getBusOnlyRoute(time),
+    getLowWalkRoute(time).catch(() => null),
   ]);
 
   const currentBucket = [...crowdForecast].reverse().find((b) => b.time <= time);
@@ -97,6 +112,9 @@ export async function getJourneyOptions(time) {
     options: [
       { id: "cycle-lrt", mode: "Cycle + LRT", ...cycleLrt },
       { id: "bus-only", mode: "Bus (multi-leg)", ...busOnly },
+      ...(lowWalkRoute
+        ? [{ id: "low-walk", mode: "Bus/MRT (least walking)", ...lowWalkRoute, crowdLevel: currentCrowd, delayMinutes: 0, affectedSegments: punggolLrtAlerts }]
+        : []),
     ],
     recommendation: { optionId: decision.recommendationId, reason: decision.reason },
     alternativeTiming: decision.alternativeTiming,

@@ -250,11 +250,12 @@ function renderBoardPersona(data) {
   if (later) $("boardLeaveLaterLabel").textContent = later.label + (later.reason ? ` — ${later.reason}` : "");
 
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
-  $("boardLeaveNowBtn").onclick = () => startNav(rec, time, arrive, data.options.find((o) => o.id !== rec.id));
+  $("boardLeaveNowBtn").onclick = () => startNav(rec, time, arrive, data.options.filter((o) => o.id !== rec.id));
 }
 
 function renderBoardCustom(route) {
-  updateWeatherBanner(null);
+  const weather = journeyData?.weather;
+  updateWeatherBanner(weather);
   $("tripBarLabel").textContent = `${selectedFrom?.name || "Your location"} → ${route.destination.name}`;
 
   const options = route.options || [];
@@ -280,11 +281,24 @@ function renderBoardCustom(route) {
   const time = nowClock();
   const arrive = addMinutesToClock(time, totalMin);
 
+  // Same weather-aware reasoning the persona board gives Arjun, applied to
+  // any custom search: warn about cycling into rain, otherwise just note
+  // current conditions alongside the usual transfer count.
+  const hasCycleLeg = (selected.legs || []).some((l) => l.mode === "CYCLE");
+  const rainingNow = !!weather?.isRainingNow;
+  const rainSoon = !rainingNow && typeof weather?.rainExpectedWithinMinutes === "number";
+  const transferText = selected.transfers > 0 ? `${selected.transfers} transfer${selected.transfers > 1 ? "s" : ""}` : "Direct";
+  const why =
+    hasCycleLeg && rainingNow ? "Raining now — a non-cycling option would stay dry" :
+    hasCycleLeg && rainSoon ? "Rain expected — a non-cycling option would stay dry" :
+    weather?.nowcast ? `${transferText} · ${weather.nowcast}` :
+    transferText;
+
   $("boardModeRow").innerHTML = `
     ${pathSvg(MODE_ICON[selected.legs?.[0]?.mode] || ICON.walk, { size: 40, width: 1.5 })}
     <div class="mode-text">
       <span class="mode-name">${route.destination.name}</span>
-      <span class="mode-why"><span>${selected.transfers > 0 ? `${selected.transfers} transfer${selected.transfers > 1 ? "s" : ""}` : "Direct"} · ${totalMin} min</span></span>
+      <span class="mode-why">${pathSvg(rainingNow || rainSoon ? ICON.rain : ICON.sun, { size: 14, stroke: "#9aa0a6", width: 2 })}<span>${why} · ${totalMin} min</span></span>
     </div>
     <span class="mode-eta">
       <span class="mode-eta-time">${arrive}</span>
@@ -296,7 +310,7 @@ function renderBoardCustom(route) {
   $("boardLeaveLater").hidden = true;
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
   $("boardLeaveNowBtn").onclick = () =>
-    startNav({ legs: selected.legs, mode: route.destination.name, totalTimeSeconds: selected.totalTimeSeconds }, time, arrive, options.find((o) => o.id !== selected.id));
+    startNav({ legs: selected.legs, mode: route.destination.name, totalTimeSeconds: selected.totalTimeSeconds }, time, arrive, options.filter((o) => o.id !== selected.id));
 }
 
 function renderBoard() {
@@ -314,7 +328,8 @@ async function refreshJourney() {
 $("tripBar").onclick = () => showScreen("plan");
 
 // ============================= Navigation =============================
-let navAlternative = null; // { mode, legs } — the other option, offered as a swap if something disrupts the current one
+let navAlternatives = []; // other route options; the best one for the actual disruption is picked when it happens
+let navAlternative = null; // the option currently offered in the swap card
 let navCurrentLegs = [];
 let navDisruptionShown = false;
 let navDisruptionPoll = null;
@@ -325,7 +340,7 @@ function optionTotalMinutes(option) {
   return Math.round((option.legs || []).reduce((sum, l) => sum + (l.durationSeconds || 0), 0) / 60);
 }
 
-function startNav(option, leaveTime, arriveTime, alternative) {
+function startNav(option, leaveTime, arriveTime, alternatives) {
   const legs = option.legs || [];
   navCurrentLegs = legs;
   const current = legs[0];
@@ -340,7 +355,8 @@ function startNav(option, leaveTime, arriveTime, alternative) {
     : "Last leg of the trip";
   $("navArrive").textContent = arriveTime;
 
-  navAlternative = alternative || null;
+  navAlternatives = alternatives || [];
+  navAlternative = null;
   navDisruptionShown = false;
   $("navRainCard").hidden = true;
 
@@ -414,14 +430,53 @@ function disruptedAlertForRoute(legs, alerts) {
 // waiting for (or faking) a real disruption. Doesn't touch the real
 // detection logic below — just short-circuits into the same UI it drives.
 const NAV_SIMULATIONS = {
-  rain: () => showDisruptionCard("It's raining", `Heavy Thundery Showers (simulated) at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`, ICON.rain),
-  accident: () => showDisruptionCard("Accident on your route", "(Simulated) Vehicle breakdown reported on your bus's road. Swap to " + navAlternative.mode + " to avoid it — arrives around the same time.", ICON.warning),
-  trainalert: () => showDisruptionCard("Line disrupted", `(Simulated) Delay due to a technical fault. Swap to ${navAlternative.mode} instead — arrives around the same time.`, ICON.train),
+  rain: () => offerRainSwap("Heavy Thundery Showers (simulated) at your location."),
+  accident: () => offerBusSwap("(Simulated) Vehicle breakdown reported on your bus's road."),
+  trainalert: () => offerTrainSwap("(Simulated) Delay due to a technical fault.", railCodes(navCurrentLegs)[0]),
 };
+
+const usesMode = (legs, mode) => (legs || []).some((l) => l.mode === mode);
+const railCodes = (legs) => (legs || []).filter((l) => l.mode === "RAIL" || l.mode === "SUBWAY").map((l) => LINE_ALERT_CODE[l.route]).filter(Boolean);
+const busRoutes = (legs) => (legs || []).filter((l) => l.mode === "BUS").map((l) => l.route);
+
+// Fastest alternative that actually avoids this disruption — never just "the other option".
+function pickAlternative(avoids, cost = optionTotalMinutes) {
+  return navAlternatives
+    .filter((o) => avoids(o.legs || []))
+    .sort((a, b) => cost(a) - cost(b))[0] || null;
+}
+
+const walkMinutes = (o) => Math.round((o.legs || []).filter((l) => l.mode === "WALK").reduce((n, l) => n + (l.durationSeconds || 0), 0) / 60);
+
+function offerSwap(title, text, icon, alt) {
+  if (!alt) return false; // nothing better than staying put — don't nag
+  navAlternative = alt;
+  showDisruptionCard(title, `${text} Swap to ${alt.mode} (${optionTotalMinutes(alt)} min total).`, icon);
+  return true;
+}
+
+// Rain: no cycling, and time on foot in the rain counts 3x — so the nearest
+// stop / least-walking bus or MRT route beats a faster route with a long walk.
+function offerRainSwap(text) {
+  const alt = pickAlternative((legs) => !usesMode(legs, "CYCLE"), (o) => optionTotalMinutes(o) + 3 * walkMinutes(o));
+  return offerSwap("It's raining", alt ? `${text} Only ${walkMinutes(alt)} min of walking on this route.` : text, ICON.rain, alt);
+}
+
+// Accident: a different bus service (or none) that doesn't pass the incident.
+function offerBusSwap(text, incidents) {
+  const current = busRoutes(navCurrentLegs);
+  const alt = pickAlternative((legs) => !busRoutes(legs).some((r) => current.includes(r)) && !(incidents && incidentOnRoute(legs, incidents)));
+  return offerSwap("Accident on your route", text, ICON.warning, alt);
+}
+
+// MRT disrupted: fastest route that doesn't ride the affected line (another line, or bus).
+function offerTrainSwap(text, lineCode, title = "Line disrupted") {
+  return offerSwap(title, text, ICON.train, pickAlternative((legs) => !railCodes(legs).includes(lineCode)));
+}
 
 function startNavDisruptionPoll() {
   stopNavDisruptionPoll();
-  if (!navAlternative) return;
+  if (!navAlternatives.length) return;
 
   const sim = NAV_SIMULATIONS[new URLSearchParams(location.search).get("simulate")];
   if (sim) {
@@ -430,29 +485,21 @@ function startNavDisruptionPoll() {
   }
 
   const check = async () => {
-    if (navDisruptionShown || !navAlternative) return;
+    if (navDisruptionShown) return;
     try {
-      // Rain only matters if this trip is actually exposed to it (cycling),
-      // and only worth a swap if the alternative isn't cycling too.
-      if (navCurrentLegs.some((l) => l.mode === "CYCLE") && !(navAlternative.legs || []).some((l) => l.mode === "CYCLE")) {
+      if (usesMode(navCurrentLegs, "CYCLE")) {
         const weather = await (await fetch(`${API}/api/weather`)).json();
-        if (weather.isRainingNow) {
-          return showDisruptionCard("It's raining", `${weather.nowcast} at your location. Swap to ${navAlternative.mode} to stay dry — arrives around the same time.`);
-        }
+        if (weather.isRainingNow && offerRainSwap(`${weather.nowcast} at your location.`)) return;
       }
-      if (navCurrentLegs.some((l) => (l.mode === "RAIL" || l.mode === "SUBWAY") && LINE_ALERT_CODE[l.route])) {
+      if (railCodes(navCurrentLegs).length) {
         const { alerts } = await (await fetch(`${API}/api/alerts`)).json();
         const alert = disruptedAlertForRoute(navCurrentLegs, alerts);
-        if (alert) {
-          return showDisruptionCard(`${alert.lineName} disrupted`, `${alert.message} Swap to ${navAlternative.mode} instead — arrives around the same time.`, ICON.train);
-        }
+        if (alert && offerTrainSwap(alert.message, alert.line, `${alert.lineName} disrupted`)) return;
       }
-      if (navCurrentLegs.some((l) => l.mode === "BUS")) {
+      if (usesMode(navCurrentLegs, "BUS")) {
         const { incidents } = await (await fetch(`${API}/api/incidents`)).json();
         const incident = incidentOnRoute(navCurrentLegs, incidents);
-        if (incident) {
-          return showDisruptionCard("Accident on your route", `${incident.message} Swap to ${navAlternative.mode} to avoid it — arrives around the same time.`, ICON.warning);
-        }
+        if (incident && offerBusSwap(incident.message, incidents)) return;
       }
     } catch {
       // silently skip this poll — try again next interval
@@ -474,7 +521,8 @@ function showDisruptionCard(title, body, icon = ICON.rain) {
 $("navSwapBtn").onclick = () => {
   const alt = navAlternative;
   $("navRainCard").hidden = true;
-  startNav(alt, nowClock(), $("navArrive").textContent);
+  const now = nowClock();
+  startNav(alt, now, addMinutesToClock(now, optionTotalMinutes(alt)), navAlternatives.filter((o) => o !== alt));
 };
 $("navKeepGoingBtn").onclick = () => {
   $("navRainCard").hidden = true;

@@ -11,6 +11,10 @@ an accident, or an MRT disruption hits your route while you're on it.
 
 **Live demo:** https://eget-562866144161.europe-west1.run.app
 
+Also deployed (Qwiklabs lab project — has the very latest commits, but
+disappears when the lab session ends, so don't rely on it lasting):
+https://eget-769419892850.europe-west1.run.app
+
 ## What it does
 
 ### Plan a trip
@@ -39,8 +43,12 @@ an accident, or an MRT disruption hits your route while you're on it.
   transfer, and total trip time
 
 ### Near You
-- Nearby bus stops and MRT/LRT stations from your live location, with live
-  arrival times from LTA DataMall — auto-refreshing every few seconds
+- Nearby bus stops **and MRT/LRT stations** from your live location — the
+  station list is built from OneMap's own ~220-station index (not a small
+  hand-picked list), so "nearest" is actually accurate wherever you are;
+  tapping a station plans a real route there, same as tapping a
+  destination suggestion
+- Live arrival times from LTA DataMall, auto-refreshing every few seconds
   while the screen's open, no manual reload needed
 - Tap a bus number for a full-screen route page: every stop plotted on
   the map, direction toggle for looping services, pull-up stop list
@@ -54,9 +62,16 @@ an accident, or an MRT disruption hits your route while you're on it.
 - Live LTA `TrainServiceAlerts` checked against your MRT/LRT leg's line —
   same reactive swap if your line goes down mid-trip
 - The swap always picks the fastest available option that actually avoids
-  the specific problem (not just "the other option") — see the
-  `?simulate=rain` / `?simulate=accident` / `?simulate=trainalert` query
-  params below to demo this without waiting for real conditions
+  the specific problem (not just "the other option"), and never suggests
+  swapping *into* cycling — see the `?simulate=rain` / `?simulate=accident`
+  / `?simulate=trainalert` query params below to demo this without
+  waiting for real conditions
+- A real OS-level push notification fires alongside the in-app swap card
+  (via a small service worker, `frontend/sw.js`), so a disruption is
+  noticeable even if the app isn't in the foreground — needs HTTPS (works
+  on the live demo; on `localhost` it's fine too, just not on a plain
+  `http://` LAN IP) and notification permission, which is requested when
+  navigation starts
 
 ### Chat
 `POST /api/chat` (`backend/src/agent.js`) is a working Claude-backed chat
@@ -75,12 +90,16 @@ flow live: open the app with one of these appended to the URL, then search
 any destination and tap "Leave now" — the card appears ~3s after you land
 on the nav screen, using the exact same UI the real detection drives:
 
-- `?simulate=rain`
-- `?simulate=accident`
-- `?simulate=trainalert`
+- `https://eget-769419892850.europe-west1.run.app/?simulate=rain`
+- `https://eget-769419892850.europe-west1.run.app/?simulate=accident`
+- `https://eget-769419892850.europe-west1.run.app/?simulate=trainalert`
 
-It's a single-page app (no reloads between screens), so the query param
-stays in the address bar the whole time — no need to re-add it per screen.
+(Swap in whichever deployed URL, or `http://localhost:8787`, is currently
+live — the query param works the same everywhere.) It's a single-page app
+(no reloads between screens), so the query param stays in the address bar
+the whole time — no need to re-add it per screen. Since these are HTTPS
+URLs, allowing the notification permission prompt also demos the real
+push notification alongside the in-app card.
 
 ## Live data, not mocks
 
@@ -94,7 +113,7 @@ call fails):
 | LTA DataMall `TrainServiceAlerts` | MRT/LRT disruption detection during nav |
 | LTA DataMall `TrafficIncidents` | accident/roadwork detection during nav |
 | LTA DataMall `PCDRealTime` / `PCDForecast` | crowd level now and forecasted |
-| OneMap routing + search | turn-by-turn directions, destination autocomplete, geocoding |
+| OneMap routing + search | turn-by-turn directions, destination autocomplete, geocoding, the full MRT/LRT station list for "Near You" |
 | data.gov.sg 2hr forecast + real-time rainfall | rain-aware routing and the reactive rain-swap prompt |
 
 ## Tech stack
@@ -120,7 +139,7 @@ call fails):
 ├── backend/
 │   ├── server.js            # Express app — serves frontend & every /api/* route
 │   └── src/                 # LTA/OneMap/weather clients, route planning, decision logic, AI agents
-└── frontend/                # index.html + app.js + styles.css — static UI, no build step
+└── frontend/                # index.html + app.js + styles.css + sw.js — static UI, no build step
 ```
 
 ## Getting started

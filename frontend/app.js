@@ -372,7 +372,7 @@ function startNavTracking() {
       else navMeMarker = L.marker(ll, { icon: haloIcon() }).addTo(navLayer);
     },
     () => {}, // tracking is a nice-to-have — silently skip on denial/error, nav still works without it
-    { enableHighAccuracy: true, maximumAge: 5000 }
+    { enableHighAccuracy: true, maximumAge: 3000 }
   );
 }
 
@@ -861,7 +861,7 @@ function stopNearPoll() {
 
 function startNearPoll() {
   stopNearPoll();
-  nearPoll = setInterval(refreshNearArrivals, 20000);
+  nearPoll = setInterval(refreshNearArrivals, 3000);
 }
 
 async function refreshNearArrivals() {

@@ -439,10 +439,18 @@ function disruptedAlertForRoute(legs, alerts) {
 // URL before starting nav to see the reactive swap-card flow without
 // waiting for (or faking) a real disruption. Doesn't touch the real
 // detection logic below — just short-circuits into the same UI it drives.
+// Unlike the real offerRainSwap/offerBusSwap/offerTrainSwap, this doesn't
+// require a *matching* alternative to exist (pickAlternative can come back
+// null for a route that genuinely has no better option right now) — a demo
+// should always show something, so it falls back to any other option, or a
+// generic placeholder if the search returned only one option total.
+function demoAlternative() {
+  return navAlternatives[0] || { mode: "a different route", legs: navCurrentLegs, totalTimeSeconds: navCurrentLegs.reduce((s, l) => s + (l.durationSeconds || 0), 0) };
+}
 const NAV_SIMULATIONS = {
-  rain: () => offerRainSwap("Heavy Thundery Showers (simulated) at your location."),
-  accident: () => offerBusSwap("(Simulated) Vehicle breakdown reported on your bus's road."),
-  trainalert: () => offerTrainSwap("(Simulated) Delay due to a technical fault.", railCodes(navCurrentLegs)[0]),
+  rain: () => offerSwap("It's raining", "Heavy Thundery Showers (simulated) at your location.", ICON.rain, demoAlternative()),
+  accident: () => offerSwap("Accident on your route", "(Simulated) Vehicle breakdown reported on your bus's road.", ICON.warning, demoAlternative()),
+  trainalert: () => offerSwap("Line disrupted", "(Simulated) Delay due to a technical fault.", ICON.train, demoAlternative()),
 };
 
 const usesMode = (legs, mode) => (legs || []).some((l) => l.mode === mode);
@@ -493,14 +501,17 @@ function offerTrainSwap(text, lineCode, title = "Line disrupted") {
 
 function startNavDisruptionPoll() {
   stopNavDisruptionPoll();
-  if (!navAlternatives.length) return;
 
+  // Checked before the "any alternatives?" gate below — a demo should
+  // always fire regardless of how many real options this particular
+  // search happened to return (demoAlternative() has its own fallback).
   const sim = NAV_SIMULATIONS[new URLSearchParams(location.search).get("simulate")];
   if (sim) {
     setTimeout(sim, 3000); // small delay so the normal nav screen is visible first
     return;
   }
 
+  if (!navAlternatives.length) return;
   const check = async () => {
     if (navDisruptionShown) return;
     try {

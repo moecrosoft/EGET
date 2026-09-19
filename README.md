@@ -215,4 +215,4 @@ isn't a continuation character there and will fail to parse.)
 
 ## Team
 
-Tang Nan · Jayasuryan Mutyala · Jie Hua · Khant · Moe
+Tang Nan · Jayasuryan Mutyala · Jie Hua · Moe

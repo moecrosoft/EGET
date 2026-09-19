@@ -372,7 +372,7 @@ function startNavTracking() {
       else navMeMarker = L.marker(ll, { icon: haloIcon() }).addTo(navLayer);
     },
     () => {}, // tracking is a nice-to-have — silently skip on denial/error, nav still works without it
-    { enableHighAccuracy: true, maximumAge: 3000 }
+    { enableHighAccuracy: true, maximumAge: 500 }
   );
 }
 

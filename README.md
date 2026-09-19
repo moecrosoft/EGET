@@ -73,15 +73,6 @@ https://eget-769419892850.europe-west1.run.app
   `http://` LAN IP) and notification permission, which is requested when
   navigation starts
 
-### Chat
-`POST /api/chat` (`backend/src/agent.js`) is a working Claude-backed chat
-agent.
-
-A second, persona-specific agentic loop for "Arjun" exists at
-`backend/src/arjunAgent.js` but isn't currently wired to a route — it
-powered an AI playground UI that was removed, and the API layer that
-exposed it (`api/`) was removed with it since nothing called it anymore.
-
 ## Demoing the reactive reroute without waiting for real disruptions
 
 Real disruptions are rare — `TrainServiceAlerts.AffectedSegments` is empty
@@ -121,8 +112,6 @@ call fails):
 - **Backend**: Node.js + Express (`backend/`), ES modules
 - **Frontend**: Vanilla JS + Leaflet.js — no build step, served as static
   files directly by the backend
-- **AI**: Anthropic Claude (`/api/chat`); Groq (Arjun's persona agent,
-  built but not currently wired to a route)
 - **Maps**: OpenStreetMap tiles, dark-mode via CSS filter
 - **Deployment**: Google Cloud Run (containerized via root `Dockerfile`)
 
@@ -161,8 +150,6 @@ Create a `.env` at the repo root (one level above `backend/`). See
 |---|---|---|
 | `LTA_ACCOUNT_KEY` | live bus/train/incident data | falls back to realistic mock data |
 | `ONEMAP_TOKEN` | routing, search, autocomplete | those endpoints return `503` |
-| `ANTHROPIC_API_KEY` | `/api/chat` | that endpoint fails |
-| `GROQ_API_KEY` | Arjun's agent (`backend/src/arjunAgent.js`) | n/a — not currently wired to a route |
 
 Both `LTA_ACCOUNT_KEY` and `ONEMAP_TOKEN` are free, self-service signups
 (links in `.env.example`) — no approval wait.

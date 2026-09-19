@@ -250,7 +250,11 @@ function renderBoardPersona(data) {
   if (later) $("boardLeaveLaterLabel").textContent = later.label + (later.reason ? ` — ${later.reason}` : "");
 
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
-  $("boardLeaveNowBtn").onclick = () => startNav(rec, time, arrive, data.options.filter((o) => o.id !== rec.id));
+  $("boardLeaveNowBtn").onclick = () => {
+    const sim = new URLSearchParams(location.search).get("simulate");
+    const start = (sim === "accident" && data.options.find((o) => usesMode(o.legs, "BUS"))) || (sim === "trainalert" && data.options.find((o) => railCodes(o.legs).length && !usesMode(o.legs, "CYCLE"))) || rec;
+    startNav(start, time, addMinutesToClock(time, start.etaMinutes), data.options.filter((o) => o.id !== start.id));
+  };
 }
 
 function renderBoardCustom(route) {
@@ -307,7 +311,13 @@ function renderBoardCustom(route) {
 
   $("boardLegStrip").innerHTML = (selected.legs || []).map((leg, i, arr) => legCard(leg, i === arr.length - 1)).join("") || `<div class="hint-text">No route legs available.</div>`;
   plotLegs(boardMap, boardLayer, selected.legs);
-  $("boardLeaveLater").hidden = true;
+
+  // Only relevant for the option it was actually computed against — tab
+  // over to Comfort/Cycle and it'd be misleading to keep showing it.
+  const delay = selected.id === route.recommendedId ? route.delaySuggestion : null;
+  $("boardLeaveLater").hidden = !delay;
+  if (delay) $("boardLeaveLaterLabel").textContent = delay.label + (delay.reason ? ` — ${delay.reason}` : "");
+
   $("boardLeaveNowBtn").textContent = `Leave now · ${time}`;
   $("boardLeaveNowBtn").onclick = () =>
     startNav({ legs: selected.legs, mode: route.destination.name, totalTimeSeconds: selected.totalTimeSeconds }, time, arrive, options.filter((o) => o.id !== selected.id));
@@ -446,12 +456,17 @@ function pickAlternative(avoids, cost = optionTotalMinutes) {
     .sort((a, b) => cost(a) - cost(b))[0] || null;
 }
 
+// "MRT" or "Bus" (or the mode of whatever the longest leg is) — no jargon.
+function altLabel(o) {
+  const main = [...(o.legs || [])].sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0))[0];
+  return main?.mode === "BUS" ? "Bus" : main?.mode === "RAIL" || main?.mode === "SUBWAY" ? "MRT" : main?.mode === "CYCLE" ? "Cycle" : "Walk";
+}
 const walkMinutes = (o) => Math.round((o.legs || []).filter((l) => l.mode === "WALK").reduce((n, l) => n + (l.durationSeconds || 0), 0) / 60);
 
 function offerSwap(title, text, icon, alt) {
   if (!alt) return false; // nothing better than staying put — don't nag
   navAlternative = alt;
-  showDisruptionCard(title, `${text} Swap to ${alt.mode} (${optionTotalMinutes(alt)} min total).`, icon);
+  showDisruptionCard(title, `${text} Swap to ${altLabel(alt)} (${optionTotalMinutes(alt)} min total).`, icon);
   return true;
 }
 
@@ -459,13 +474,15 @@ function offerSwap(title, text, icon, alt) {
 // stop / least-walking bus or MRT route beats a faster route with a long walk.
 function offerRainSwap(text) {
   const alt = pickAlternative((legs) => !usesMode(legs, "CYCLE"), (o) => optionTotalMinutes(o) + 3 * walkMinutes(o));
-  return offerSwap("It's raining", alt ? `${text} Only ${walkMinutes(alt)} min of walking on this route.` : text, ICON.rain, alt);
+  return offerSwap("It's raining", text, ICON.rain, alt);
 }
 
 // Accident: a different bus service (or none) that doesn't pass the incident.
 function offerBusSwap(text, incidents) {
   const current = busRoutes(navCurrentLegs);
-  const alt = pickAlternative((legs) => !busRoutes(legs).some((r) => current.includes(r)) && !(incidents && incidentOnRoute(legs, incidents)));
+  const differentBus = (legs) => !busRoutes(legs).some((r) => current.includes(r)) && !(incidents && incidentOnRoute(legs, incidents));
+  // a different bus service is the first choice; any other clean route if none exists
+  const alt = pickAlternative(differentBus, (o) => optionTotalMinutes(o) + (usesMode(o.legs, "BUS") ? 0 : 1000));
   return offerSwap("Accident on your route", text, ICON.warning, alt);
 }
 
@@ -514,7 +531,7 @@ function showDisruptionCard(title, body, icon = ICON.rain) {
   $("navRainCardIconPath").setAttribute("d", icon);
   $("navRainCardTitle").textContent = title;
   $("navRainCardBody").textContent = body;
-  $("navSwapBtn").textContent = `Swap to ${navAlternative.mode}`;
+  $("navSwapBtn").textContent = `Swap to ${altLabel(navAlternative)}`;
   $("navRainCard").hidden = false;
 }
 

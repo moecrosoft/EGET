@@ -1,6 +1,6 @@
 import { geocodeAddress, getPtItineraries, getWalkCycleRoute } from "./onemapClient.js";
 import { todayDateString, toOneMapTime } from "./dateUtils.js";
-import { findStationByName } from "./ltaClient.js";
+import { findStationByName, getLineCrowdTrend, CROWD_LINE_CODE } from "./ltaClient.js";
 
 function transitModeLabel(legs) {
   const hasRail = legs.some((l) => l.mode === "RAIL" || l.mode === "SUBWAY");
@@ -9,6 +9,37 @@ function transitModeLabel(legs) {
   if (hasRail) return "Train";
   if (hasBus) return "Bus";
   return "Walk";
+}
+
+// If the recommended option rides a rail line, checks whether that line's
+// crowding is forecast to meaningfully ease within the next hour and, if
+// so, suggests waiting for it — the same "leave later" idea Arjun's board
+// already offers, generalized to any line instead of one fixed station.
+// Real data end-to-end; returns null (no suggestion) rather than guessing
+// whenever the forecast call fails or nothing's clearly better.
+async function findDelaySuggestion(legs, time) {
+  const railLeg = (legs || []).find((l) => (l.mode === "RAIL" || l.mode === "SUBWAY") && CROWD_LINE_CODE[l.route]);
+  if (!railLeg) return null;
+
+  const trend = await getLineCrowdTrend(CROWD_LINE_CODE[railLeg.route]);
+  if (trend.length < 2) return null;
+
+  const [nowH, nowM] = time.split(":").map(Number);
+  const nowMinutes = nowH * 60 + nowM;
+  const toMinutes = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+  const nowBucket = [...trend].reverse().find((b) => toMinutes(b.time) <= nowMinutes) || trend[0];
+  const upcoming = trend.filter((b) => { const m = toMinutes(b.time); return m > nowMinutes && m <= nowMinutes + 60; });
+  // 0.34 ~= a third of a crowd-level step (l/m/h scored 1/2/3) — enough to
+  // call "meaningfully quieter", not just forecast noise between buckets.
+  const quieter = upcoming.find((b) => b.avgScore < nowBucket.avgScore - 0.34);
+  if (!quieter) return null;
+
+  return {
+    waitMinutes: toMinutes(quieter.time) - nowMinutes,
+    label: `Wait ${toMinutes(quieter.time) - nowMinutes} min, leave later`,
+    reason: `${railLeg.route} Line crowding eases around ${quieter.time}`,
+  };
 }
 
 /**
@@ -97,9 +128,12 @@ export async function planRoute({ from, to, toLatLng, time }) {
   }
   options.sort((a, b) => a.totalTimeSeconds - b.totalTimeSeconds);
 
+  const delaySuggestion = await findDelaySuggestion(options[0].legs, time).catch(() => null);
+
   return {
     destination: { name: to, ...destination },
     options,
     recommendedId: options[0].id,
+    delaySuggestion,
   };
 }

@@ -186,6 +186,47 @@ export async function getStationCrowdForecast(trainLineCode, stationCode) {
   }
 }
 
+// LTA's own documented PCDForecast/PCDRealTime `TrainLine` enum. Only
+// "PLRT" has ever actually been verified against a live response in this
+// codebase (see journeyPlanner.js) — these six are from LTA's published API
+// docs, not independently confirmed live, since the account's PCDForecast
+// quota has been exhausted for the rest of this session. Small, stable
+// enum (11 values total), unlike individual per-station codes, which this
+// deliberately avoids needing at all.
+export const CROWD_LINE_CODE = { NS: "NSL", EW: "EWL", CG: "CGL", NE: "NEL", CC: "CCL", CE: "CEL", DT: "DTL", TE: "TEL" };
+
+/**
+ * Average crowd level across every station on a line, per forecast time
+ * bucket — a coarser signal than per-station (PCDForecast's response
+ * already groups by station; this collapses that back down), but it avoids
+ * needing a name-to-station-code lookup for whichever specific station a
+ * route happens to pass through. Real data, not simulated — just
+ * line-level instead of stop-level.
+ */
+export async function getLineCrowdTrend(trainLineCode) {
+  if (!hasRealKey()) return [];
+  try {
+    const data = await ltaFetch(`/PCDForecast?TrainLine=${trainLineCode}`);
+    const stations = (data?.value ?? [])[0]?.Stations ?? [];
+    if (!stations.length) return [];
+    const SCORE = { l: 1, m: 2, h: 3 };
+    const byTime = new Map();
+    for (const station of stations) {
+      for (const entry of station.Interval ?? []) {
+        const time = entry.Start.slice(11, 16);
+        const score = SCORE[String(entry.CrowdLevel).toLowerCase()] ?? 2;
+        if (!byTime.has(time)) byTime.set(time, []);
+        byTime.get(time).push(score);
+      }
+    }
+    return [...byTime.entries()]
+      .map(([time, scores]) => ({ time, avgScore: scores.reduce((a, b) => a + b, 0) / scores.length }))
+      .sort((a, b) => a.time.localeCompare(b.time));
+  } catch {
+    return [];
+  }
+}
+
 export function getAllStations() {
   return MRT_STATIONS;
 }

@@ -1,6 +1,6 @@
 # EGET — Smart Commuter Companion
 
-A transit app for Singapore that answers the question commuters actually
+A commute app for Singapore that answers the question commuters actually
 ask every morning: **"how do I get there, and will something ruin it on the
 way?"** Built for Problem Statement 2 (see
 [`Problem_Statement_2_Specification.pdf`](Problem_Statement_2_Specification.pdf)).
